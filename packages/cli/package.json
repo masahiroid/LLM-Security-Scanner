@@ -1,0 +1,15 @@
+{
+  "name": "@llmscan/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LLM Security Scanner の CLI（CI 用。text / json / SARIF 出力）",
+  "bin": {
+    "llmscan": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@llmscan/core": "0.1.0"
+  }
+}

@@ -1,0 +1,123 @@
+import type { Family } from './languages/spec';
+import type { OriginKind, Severity, SinkKind } from './types';
+
+export interface KindMeta {
+  code: string;
+  title: string;
+  cwe: string;
+  baseSeverity: Severity;
+  /** 危険な理由 */
+  why: string;
+  /** 言語別の安全な書き方 */
+  fix: Record<Family, string>;
+}
+
+export const KIND_META: Record<SinkKind, KindMeta> = {
+  sqli: {
+    code: 'SQLI',
+    title: 'SQL インジェクション',
+    cwe: 'CWE-89',
+    baseSeverity: 'high',
+    why: '外部から来た値が SQL 文の一部として解釈され、条件の改ざん・データの窃取・削除が可能になります。',
+    fix: {
+      python: 'プレースホルダを使い、値は別引数で渡します: `cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))`',
+      javascript: 'プレースホルダ付きのクエリにします: `db.query("SELECT * FROM users WHERE id = ?", [id])`。Prisma なら `$queryRaw` のタグ付きテンプレートを使います。',
+      php: 'プリペアドステートメントを使います: `$stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?"); $stmt->execute([$id]);`',
+    },
+  },
+  cmdi: {
+    code: 'CMDI',
+    title: 'OS コマンドインジェクション',
+    cwe: 'CWE-78',
+    baseSeverity: 'critical',
+    why: 'シェルを経由してコマンドを組み立てると、`;` や `$( )` で任意のコマンドを実行されます。',
+    fix: {
+      python: '`shell=True` をやめ、引数をリストで渡します: `subprocess.run(["convert", path], check=True)`',
+      javascript: '`exec` をやめ、`execFile` / `spawn` に引数を配列で渡します（`shell: true` は指定しない）。',
+      php: 'できるだけ PHP の関数で代替し、やむを得ない場合は各引数を `escapeshellarg()` で囲みます。',
+    },
+  },
+  codei: {
+    code: 'CODEI',
+    title: 'コードインジェクション',
+    cwe: 'CWE-94',
+    baseSeverity: 'critical',
+    why: '文字列をコードとして実行するため、外部の値が混ざると任意のコードを実行されます。',
+    fix: {
+      python: '`eval` / `exec` を使わない設計にします。値の解析なら `ast.literal_eval` や `json.loads` を使います。',
+      javascript: '`eval` / `new Function` / 文字列を渡す `setTimeout` を使わない設計にします。値の解析なら `JSON.parse` を使います。',
+      php: '`eval` / `assert(文字列)` / `create_function` を使わない設計にします。',
+    },
+  },
+  deser: {
+    code: 'DESER',
+    title: '安全でないデシリアライズ',
+    cwe: 'CWE-502',
+    baseSeverity: 'high',
+    why: 'pickle / unserialize 等は復元時にオブジェクトのコードが動くため、外部データを渡すと任意コード実行につながります。',
+    fix: {
+      python: 'JSON 等のデータ専用形式に置き換えます。YAML は `yaml.safe_load`、PyTorch は `torch.load(..., weights_only=True)` を使います。',
+      javascript: 'JSON.parse 等のデータ専用の形式に置き換えます。',
+      php: '`json_decode` に置き換えます。やむを得ない場合は `unserialize($x, ["allowed_classes" => false])` とします。',
+    },
+  },
+  xss: {
+    code: 'XSS',
+    title: 'クロスサイトスクリプティング（XSS）',
+    cwe: 'CWE-79',
+    baseSeverity: 'medium',
+    why: 'エスケープせずに HTML として出力すると、利用者のブラウザで任意のスクリプトが動きます。',
+    fix: {
+      python: 'テンプレートの自動エスケープに任せ、`Markup` / `mark_safe` / `|safe` で無効化しないでください。',
+      javascript: '`textContent` を使うか、HTML が必要なら DOMPurify 等で無害化します。React では `dangerouslySetInnerHTML` を避けます。',
+      php: '出力時に `htmlspecialchars($v, ENT_QUOTES, "UTF-8")` でエスケープします。',
+    },
+  },
+  ssti: {
+    code: 'SSTI',
+    title: 'サーバーサイドテンプレートインジェクション',
+    cwe: 'CWE-1336',
+    baseSeverity: 'high',
+    why: 'テンプレートそのものを外部の値から作ると、テンプレート構文経由でサーバー上のコードを実行されます。',
+    fix: {
+      python: 'テンプレートは固定のファイル（`render_template`）にし、外部の値は変数として渡します。',
+      javascript: 'テンプレートは固定にし、外部の値はレンダリング時のデータとして渡します。',
+      php: 'テンプレートは固定にし、外部の値は変数として渡します。',
+    },
+  },
+  fileinc: {
+    code: 'FILEINC',
+    title: 'ファイルインクルード',
+    cwe: 'CWE-98',
+    baseSeverity: 'high',
+    why: '外部の値で読み込むファイルを決めると、任意のファイルの読み込みやコード実行につながります。',
+    fix: {
+      python: '読み込むファイルは許可リストから選びます。',
+      javascript: '読み込むファイルは許可リストから選びます。',
+      php: '`include` するファイルは許可リスト（配列のキー照合など）から選び、外部の値を直接パスに使わないでください。',
+    },
+  },
+};
+
+export const SEVERITY_ORDER: Record<Severity, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+
+export function severityFor(kind: SinkKind, origin: OriginKind): Severity {
+  const base = KIND_META[kind].baseSeverity;
+  if (origin !== 'llm') return base;
+  // LLM05: LLM の出力を危険な処理に渡すのは、プロンプトインジェクション経由で外部から操作できるため一段重くする
+  return kind === 'xss' ? 'high' : 'critical';
+}
+
+export function ruleIdFor(kind: SinkKind, origin: OriginKind, prefix: string): string {
+  const code = KIND_META[kind].code;
+  return origin === 'llm' ? `LLM05-${code}-001` : `${prefix}-${code}-001`;
+}
+
+export const OWASP_A05 = { id: 'A05:2025', title: 'インジェクション', url: 'https://owasp.org/Top10/' };
+export const OWASP_LLM05 = {
+  id: 'LLM05:2025',
+  title: '不適切な出力処理（Improper Output Handling）',
+  url: 'https://genai.owasp.org/llmrisk/llm052025-improper-output-handling/',
+};
+
+export const SUPPRESSION_RULE_ID = 'LLMSCAN-SUPPRESS-001';

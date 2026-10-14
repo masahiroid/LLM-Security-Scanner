@@ -1,0 +1,105 @@
+{
+  "name": "llm-security-scanner",
+  "displayName": "LLM Security Scanner",
+  "description": "Python / TypeScript / JavaScript / PHP のインジェクションと、LLM の応答を危険な処理に渡すコード（OWASP LLM05）を検出します",
+  "version": "0.1.0",
+  "publisher": "masahiroid",
+  "private": true,
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/masahiroid/LLM-Security-Scanner.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters"
+  ],
+  "keywords": [
+    "security",
+    "owasp",
+    "sql injection",
+    "xss",
+    "llm",
+    "prompt injection"
+  ],
+  "main": "dist/extension.js",
+  "activationEvents": [
+    "onLanguage:python",
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact",
+    "onLanguage:php",
+    "workspaceContains:.llmscan.yml"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "静的解析のみで、コードの実行や外部への送信は行いません。"
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "llmscan.scanWorkspace",
+        "title": "ワークスペース全体をスキャン",
+        "category": "LLM Security Scanner"
+      },
+      {
+        "command": "llmscan.createBaseline",
+        "title": "現在の指摘でベースラインを作成・更新",
+        "category": "LLM Security Scanner"
+      }
+    ],
+    "configuration": {
+      "title": "LLM Security Scanner",
+      "properties": {
+        "llmscan.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "スキャンを有効にする"
+        },
+        "llmscan.minConfidence": {
+          "type": "string",
+          "enum": [
+            "",
+            "low",
+            "medium",
+            "high"
+          ],
+          "enumDescriptions": [
+            ".llmscan.yml の設定に従う（未設定なら medium）",
+            "すべて表示（推定のみの指摘も含む）",
+            "経路が推定できる指摘以上",
+            "経路が確定している指摘のみ"
+          ],
+          "default": "",
+          "description": "表示する指摘の確信度の下限"
+        },
+        "llmscan.showBaselined": {
+          "type": "boolean",
+          "default": false,
+          "description": "ベースラインに登録済みの既存の指摘も表示する"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "package": "npm run build && vsce package --no-dependencies --skip-license"
+  },
+  "dependencies": {
+    "@llmscan/core": "0.1.0",
+    "vscode-languageclient": "9.0.1",
+    "vscode-languageserver": "9.0.1",
+    "vscode-languageserver-textdocument": "1.0.12",
+    "vscode-uri": "3.1.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "1.85.0",
+    "@vscode/vsce": "3.9.2"
+  }
+}
