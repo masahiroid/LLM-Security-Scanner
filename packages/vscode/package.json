@@ -141,7 +141,12 @@
         {
           "command": "llmscan.createBaseline",
           "when": "view == llmscan.findings",
-          "group": "navigation@6"
+          "group": "1_baseline@1"
+        },
+        {
+          "command": "llmscan.clearBaseline",
+          "when": "view == llmscan.findings",
+          "group": "1_baseline@2"
         }
       ]
     },

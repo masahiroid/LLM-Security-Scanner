@@ -145,7 +145,7 @@ async function findingsFor(target: ScanTarget): Promise<Finding[]> {
 async function publish(target: ScanTarget): Promise<number> {
   const findings = await findingsFor(target);
   shown.set(target.uri, findings);
-  await connection.sendDiagnostics({ uri: target.uri, diagnostics: findings.map((f) => toDiagnostic(f, target.uri)) });
+  await connection.sendDiagnostics({ uri: target.uri, diagnostics: findings.map((f) => toDiagnostic(f, target.uri, isJa())) });
   return findings.length;
 }
 
@@ -355,7 +355,7 @@ connection.onHover((params): Hover | null => {
     return afterStart && beforeEnd;
   });
   if (hits.length === 0) return null;
-  return { contents: { kind: MarkupKind.Markdown, value: hits.map(createHoverMarkdown).join('\n\n---\n\n') } };
+  return { contents: { kind: MarkupKind.Markdown, value: hits.map((h) => createHoverMarkdown(h, isJa())).join('\n\n---\n\n') } };
 });
 
 connection.onCodeAction((params): CodeAction[] => {

@@ -1,4 +1,4 @@
-import { CONFIDENCE_LABEL, type Finding, OWASP_A05, OWASP_LLM05 } from '@llmscan/core';
+import { CONFIDENCE_LABEL, CONFIDENCE_LABEL_EN, type Finding, KIND_META, OWASP_A05, OWASP_LLM05 } from '@llmscan/core';
 import { type Diagnostic, DiagnosticSeverity } from 'vscode-languageserver/node';
 
 const SEVERITY_MAP: Record<Finding['severity'], DiagnosticSeverity> = {
@@ -8,8 +8,43 @@ const SEVERITY_MAP: Record<Finding['severity'], DiagnosticSeverity> = {
   low: DiagnosticSeverity.Information,
 };
 
-export function toDiagnostic(f: Finding, uri: string): Diagnostic {
+export function translateTraceStep(msg: string): string {
+  return msg
+    .replace(/^(\d+\/\d+):\s*入力源:\s*/, '$1: Source: ')
+    .replace(/^(\d+\/\d+):\s*危険な処理:\s*/, '$1: Dangerous sink: ')
+    .replace(/変数\s+([a-zA-Z0-9_$]+)\s+に代入/, 'Assigned to variable $1')
+    .replace(/ユーザー入力/, 'User input')
+    .replace(/関数の引数/, 'Function parameter')
+    .replace(/LLM の応答/, 'LLM model output')
+    .replace(/を代入/, 'assigned')
+    .replace(/経由/, 'via');
+}
+
+export function toDiagnostic(f: Finding, uri: string, isJa = true): Diagnostic {
   const owasp = f.ruleId.startsWith('LLM05') ? OWASP_LLM05 : OWASP_A05;
+  const meta = f.kind !== 'suppression' ? KIND_META[f.kind] : undefined;
+
+  let msg = f.message;
+  if (!isJa && meta) {
+    const originLabel =
+      f.origin === 'llm'
+        ? 'LLM output'
+        : f.origin === 'user'
+          ? 'Untrusted user input'
+          : 'Function parameter';
+    const prefix =
+      f.origin === 'llm'
+        ? `[LLM05 Insecure Output Handling / ${meta.titleEn}]`
+        : `[${meta.titleEn}]`;
+    const tail =
+      f.origin === 'param'
+        ? '. Dangerous if caller passes external data.'
+        : '';
+    msg = `${prefix} ${originLabel} flows into dangerous sink without sanitization${tail} (Confidence: ${CONFIDENCE_LABEL_EN[f.confidence]})`;
+  } else if (f.kind !== 'suppression') {
+    msg = `${f.message}（確信度: ${CONFIDENCE_LABEL[f.confidence]}）`;
+  }
+
   return {
     range: {
       start: { line: f.range.start.line, character: f.range.start.column },
@@ -19,10 +54,7 @@ export function toDiagnostic(f: Finding, uri: string): Diagnostic {
     source: 'llmscan',
     code: f.ruleId,
     codeDescription: f.kind === 'suppression' ? undefined : { href: owasp.url },
-    message:
-      f.kind === 'suppression'
-        ? f.message
-        : `${f.message}（確信度: ${CONFIDENCE_LABEL[f.confidence]}）`,
+    message: msg,
     relatedInformation: f.trace.map((s) => ({
       location: {
         uri,
@@ -31,7 +63,7 @@ export function toDiagnostic(f: Finding, uri: string): Diagnostic {
           end: { line: s.range.end.line, character: s.range.end.column },
         },
       },
-      message: s.message,
+      message: !isJa ? translateTraceStep(s.message) : s.message,
     })),
     data: {
       ruleId: f.ruleId,
