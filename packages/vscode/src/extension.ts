@@ -31,6 +31,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // llmscan.scanWorkspace / llmscan.createBaseline は Language Server の executeCommand として登録される
   await client.start();
 
+  client.onNotification('llmscan/scanStarted', () => {
+    provider.markScanning();
+  });
   client.onNotification('llmscan/scanCompleted', (p: { total: number; files: number }) => {
     provider.markScanned(p.files);
   });

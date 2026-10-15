@@ -5,9 +5,8 @@ minConfidence: medium
 failOn: high
 baseline: .llmscan-baseline.json
 
-# テスト用フィクスチャを除外したい場合は以下を有効化してください
-# exclude:
-#   - "**/test/**"
-#   - "**/tests/**"
-#   - "**/fixtures/**"
+exclude:
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/fixtures/**"
 

@@ -200,6 +200,7 @@ function* workspaceFiles(): Generator<WorkspaceFile> {
 }
 
 async function scanWorkspace(): Promise<{ files: number; findings: number }> {
+  void connection.sendNotification('llmscan/scanStarted');
   let total = 0;
   let files = 0;
   for (const { target } of workspaceFiles()) {
