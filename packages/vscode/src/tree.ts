@@ -76,32 +76,30 @@ export class FindingsTreeDataProvider implements vscode.TreeDataProvider<Finding
     if (!element) {
       const items: FindingsTreeItem[] = [];
 
-      // 1. 最上部のアクションボタン
+      // 1. 最上部のスキャンボタン
       if (this.scanState.status === 'scanning') {
         const scanningItem = new FindingsTreeItem(
-          isJa ? 'スキャンを実行中...' : 'Scanning workspace...',
+          isJa ? 'スキャン中...' : 'Scanning...',
           vscode.TreeItemCollapsibleState.None,
           'status',
         );
-        scanningItem.description = isJa ? 'ファイルを解析しています' : 'Analyzing files...';
         scanningItem.iconPath = new vscode.ThemeIcon('sync~spin');
         items.push(scanningItem);
       } else {
         const scanBtn = new FindingsTreeItem(
           this.scanState.status === 'scanned'
-            ? (isJa ? 'ワークスペース全体を再スキャン' : 'Rescan Workspace')
-            : (isJa ? 'ワークスペース全体をスキャン' : 'Scan Workspace'),
+            ? (isJa ? 'ワークスペースを再スキャン' : 'Rescan Workspace')
+            : (isJa ? 'ワークスペースをスキャン' : 'Scan Workspace'),
           vscode.TreeItemCollapsibleState.None,
           'action',
         );
-        scanBtn.description = isJa ? 'クリックして検査実行' : 'Click to scan';
         scanBtn.iconPath = new vscode.ThemeIcon(
           this.scanState.status === 'scanned' ? 'refresh' : 'play',
           new vscode.ThemeColor('charts.green'),
         );
         scanBtn.command = {
           command: 'llmscan.scanWorkspace',
-          title: isJa ? 'ワークスペース全体をスキャン' : 'Scan Workspace',
+          title: isJa ? 'ワークスペースをスキャン' : 'Scan Workspace',
         };
         items.push(scanBtn);
       }
@@ -130,54 +128,20 @@ export class FindingsTreeDataProvider implements vscode.TreeDataProvider<Finding
         );
       }, 0);
 
-      // 指摘が存在する場合: AI修正プロンプトコピー、レポート出力、クリアボタン
+      // 指摘が存在する場合: AI修正用プロンプトコピーボタンとファイル一覧を表示
       if (totalFindings > 0) {
         const copyBtn = new FindingsTreeItem(
           isJa ? 'AI 修正用プロンプトをコピー' : 'Copy for AI Fix',
           vscode.TreeItemCollapsibleState.None,
           'action',
         );
-        copyBtn.description = isJa ? `${totalFindings} 件の指摘を一括コピー` : `Copy ${totalFindings} findings`;
+        copyBtn.description = isJa ? `(${totalFindings} 件)` : `(${totalFindings} items)`;
         copyBtn.iconPath = new vscode.ThemeIcon('copy', new vscode.ThemeColor('charts.blue'));
         copyBtn.command = {
           command: 'llmscan.copyFindings',
           title: isJa ? 'AI 修正用プロンプトをコピー' : 'Copy for AI Fix',
         };
         items.push(copyBtn);
-
-        const exportBtn = new FindingsTreeItem(
-          isJa ? 'レポートをタブで開く' : 'Open Report in Tab',
-          vscode.TreeItemCollapsibleState.None,
-          'action',
-        );
-        exportBtn.description = isJa ? 'Markdown 形式で表示' : 'View Markdown report';
-        exportBtn.iconPath = new vscode.ThemeIcon('output');
-        exportBtn.command = {
-          command: 'llmscan.exportReport',
-          title: isJa ? 'レポートをタブで開く' : 'Open Report in Tab',
-        };
-        items.push(exportBtn);
-
-        const clearBtn = new FindingsTreeItem(
-          isJa ? 'スキャン結果をクリア' : 'Clear Scan Results',
-          vscode.TreeItemCollapsibleState.None,
-          'action',
-        );
-        clearBtn.iconPath = new vscode.ThemeIcon('clear-all');
-        clearBtn.command = {
-          command: 'llmscan.clearScan',
-          title: isJa ? 'スキャン結果をクリア' : 'Clear Scan Results',
-        };
-        items.push(clearBtn);
-
-        // 指摘サマリーヘッダー
-        const summaryItem = new FindingsTreeItem(
-          isJa ? `検出されたセキュリティ指摘 (${totalFindings}件)` : `Security Findings (${totalFindings})`,
-          vscode.TreeItemCollapsibleState.None,
-          'status',
-        );
-        summaryItem.iconPath = new vscode.ThemeIcon('alert', new vscode.ThemeColor('problemsWarningIcon.foreground'));
-        items.push(summaryItem);
 
         // 各ファイル項目（配下に指摘を展開）
         for (const [uri, diags] of fileDiagnostics) {
@@ -211,77 +175,23 @@ export class FindingsTreeDataProvider implements vscode.TreeDataProvider<Finding
       // 指摘が 0 件の場合（スキャン完了後）
       if (this.scanState.status === 'scanned') {
         const secureItem = new FindingsTreeItem(
-          isJa ? '✓ 脆弱性は検出されませんでした' : '✓ No vulnerabilities detected',
+          isJa ? '✓ 問題なし（脆弱性は検出されませんでした）' : '✓ No issues (No vulnerabilities detected)',
           vscode.TreeItemCollapsibleState.None,
           'status',
         );
-        secureItem.description = isJa ? '安全です' : 'Workspace is secure';
         secureItem.iconPath = new vscode.ThemeIcon('pass', new vscode.ThemeColor('testing.iconPassed'));
         items.push(secureItem);
-
-        const countItem = new FindingsTreeItem(
-          isJa
-            ? `${this.scanState.totalFiles} ファイルを検査完了`
-            : `${this.scanState.totalFiles} files scanned`,
-          vscode.TreeItemCollapsibleState.None,
-          'status',
-        );
-        countItem.description = isJa ? '指摘 0 件' : '0 findings';
-        countItem.iconPath = new vscode.ThemeIcon('folder');
-        items.push(countItem);
-
-        const excludeItem = new FindingsTreeItem(
-          isJa ? '除外設定 (.llmscan.yml)' : 'Exclusions (.llmscan.yml)',
-          vscode.TreeItemCollapsibleState.None,
-          'status',
-        );
-        excludeItem.description = isJa ? 'テスト/フィクスチャ除外適用中' : 'Active';
-        excludeItem.iconPath = new vscode.ThemeIcon('filter');
-        items.push(excludeItem);
-
-        if (this.scanState.lastScanTime) {
-          const timeItem = new FindingsTreeItem(
-            isJa ? `最終スキャン: ${this.scanState.lastScanTime}` : `Last scanned: ${this.scanState.lastScanTime}`,
-            vscode.TreeItemCollapsibleState.None,
-            'status',
-          );
-          timeItem.iconPath = new vscode.ThemeIcon('history');
-          items.push(timeItem);
-        }
-
-        const clearBtn = new FindingsTreeItem(
-          isJa ? 'スキャン結果をクリア' : 'Clear Scan Results',
-          vscode.TreeItemCollapsibleState.None,
-          'action',
-        );
-        clearBtn.iconPath = new vscode.ThemeIcon('clear-all');
-        clearBtn.command = {
-          command: 'llmscan.clearScan',
-          title: isJa ? 'スキャン結果をクリア' : 'Clear Scan Results',
-        };
-        items.push(clearBtn);
-
         return items;
       }
 
-      // 未スキャン（初期状態）
-      const infoItem = new FindingsTreeItem(
-        isJa ? 'リアルタイム静的解析' : 'Real-time Static Scanner',
+      // 未スキャン時（初期状態）
+      const idleItem = new FindingsTreeItem(
+        isJa ? '（未スキャン）' : '(Not scanned yet)',
         vscode.TreeItemCollapsibleState.None,
         'status',
       );
-      infoItem.description = isJa ? '開いたファイルは自動解析されます' : 'Active files analyzed live';
-      infoItem.iconPath = new vscode.ThemeIcon('info');
-      items.push(infoItem);
-
-      const confItem = new FindingsTreeItem(
-        isJa ? '設定 (.llmscan.yml)' : 'Config (.llmscan.yml)',
-        vscode.TreeItemCollapsibleState.None,
-        'status',
-      );
-      confItem.description = isJa ? 'テスト/フィクスチャ除外設定中' : 'Excluding test fixtures';
-      confItem.iconPath = new vscode.ThemeIcon('gear');
-      items.push(confItem);
+      idleItem.iconPath = new vscode.ThemeIcon('info');
+      items.push(idleItem);
 
       return items;
     }
@@ -378,7 +288,7 @@ export function registerFindingsView(context: vscode.ExtensionContext): {
     if (total > 0) {
       treeView.description = isJa ? `${total} 件の指摘` : `${total} findings`;
     } else if (provider.isScanned()) {
-      treeView.description = isJa ? '安全 (0件)' : 'Secure (0)';
+      treeView.description = isJa ? '問題なし' : 'No issues';
     } else {
       treeView.description = undefined;
     }
