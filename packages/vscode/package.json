@@ -1,9 +1,10 @@
 {
-  "name": "llm-security-scanner",
-  "displayName": "LLM Security Scanner",
-  "description": "Python / TypeScript / JavaScript / PHP のインジェクションと、LLM の応答を危険な処理に渡すコード（OWASP LLM05）を検出します",
-  "version": "0.1.0",
-  "publisher": "masahiroid",
+  "name": "llm-security-scan",
+  "displayName": "LLMScan - AI Security Scanner",
+  "description": "Bilingual (EN/JA) local static security scanner for Python, TypeScript, JavaScript, and PHP. Detects code/SQL injection and OWASP LLM05.",
+  "version": "1.2.0",
+  "publisher": "masahirocom",
+  "icon": "icon.png",
   "private": true,
   "license": "UNLICENSED",
   "repository": {
@@ -32,7 +33,8 @@
     "onLanguage:typescript",
     "onLanguage:typescriptreact",
     "onLanguage:php",
-    "workspaceContains:.llmscan.yml"
+    "workspaceContains:.llmscan.yml",
+    "onView:llmscan.findings"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -42,25 +44,75 @@
     "virtualWorkspaces": false
   },
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "llmscan",
+          "title": "LLMScan",
+          "icon": "media/llm.svg"
+        }
+      ]
+    },
+    "views": {
+      "llmscan": [
+        {
+          "id": "llmscan.findings",
+          "name": "%llmscan.views.findings%"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "llmscan.findings",
+        "contents": "Detect security issues in your workspace.\n[Scan Workspace](command:llmscan.scanWorkspace)\n[Create / Update Baseline](command:llmscan.createBaseline)"
+      }
+    ],
     "commands": [
       {
         "command": "llmscan.scanWorkspace",
-        "title": "ワークスペース全体をスキャン",
-        "category": "LLM Security Scanner"
+        "title": "%llmscan.commands.scanWorkspace%",
+        "category": "LLMScan",
+        "icon": "$(refresh)"
       },
       {
         "command": "llmscan.createBaseline",
-        "title": "現在の指摘でベースラインを作成・更新",
-        "category": "LLM Security Scanner"
+        "title": "%llmscan.commands.createBaseline%",
+        "category": "LLMScan",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "llmscan.toggleFilter",
+        "title": "%llmscan.commands.toggleFilter%",
+        "category": "LLMScan",
+        "icon": "$(filter)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "llmscan.scanWorkspace",
+          "when": "view == llmscan.findings",
+          "group": "navigation@1"
+        },
+        {
+          "command": "llmscan.createBaseline",
+          "when": "view == llmscan.findings",
+          "group": "navigation@2"
+        },
+        {
+          "command": "llmscan.toggleFilter",
+          "when": "view == llmscan.findings",
+          "group": "navigation@3"
+        }
+      ]
+    },
     "configuration": {
-      "title": "LLM Security Scanner",
+      "title": "LLMScan",
       "properties": {
         "llmscan.enable": {
           "type": "boolean",
           "default": true,
-          "description": "スキャンを有効にする"
+          "description": "%llmscan.config.enable%"
         },
         "llmscan.minConfidence": {
           "type": "string",
@@ -71,28 +123,29 @@
             "high"
           ],
           "enumDescriptions": [
-            ".llmscan.yml の設定に従う（未設定なら medium）",
-            "すべて表示（推定のみの指摘も含む）",
-            "経路が推定できる指摘以上",
-            "経路が確定している指摘のみ"
+            "Follow .llmscan.yml configuration (default: medium)",
+            "Show all findings including low-confidence heuristics",
+            "Show findings where dataflow is plausibly traced",
+            "Show only findings where dataflow path is confirmed"
           ],
           "default": "",
-          "description": "表示する指摘の確信度の下限"
+          "description": "%llmscan.config.minConfidence%"
         },
         "llmscan.showBaselined": {
           "type": "boolean",
           "default": false,
-          "description": "ベースラインに登録済みの既存の指摘も表示する"
+          "description": "%llmscan.config.showBaselined%"
         }
       }
     }
   },
   "scripts": {
     "build": "node build.mjs",
-    "package": "npm run build && vsce package --no-dependencies --skip-license"
+    "package": "npm run build && vsce package --no-dependencies --skip-license",
+    "publish": "npm run build && vsce publish --no-dependencies --skip-license"
   },
   "dependencies": {
-    "@llmscan/core": "0.1.0",
+    "@llmscan/core": "1.2.0",
     "vscode-languageclient": "9.0.1",
     "vscode-languageserver": "9.0.1",
     "vscode-languageserver-textdocument": "1.0.12",

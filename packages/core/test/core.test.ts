@@ -131,3 +131,127 @@ describe('対象外', () => {
     expect(await scanSource('declare function eval(x: string): void;', 'a.d.ts')).toEqual([]);
   });
 });
+
+describe('Phase 1: ORM・バリデータ拡充', () => {
+  it('TypeScript: TypeORM dataSource.query を検出する', async () => {
+    const code = `
+      import express from 'express';
+      const app = express();
+      app.get('/test', async (req, res) => {
+        const id = req.query.id as string;
+        await dataSource.query("SELECT * FROM users WHERE id = " + id);
+      });
+    `;
+    const findings = await scanSource(code, 'test.ts');
+    expect(findings.some((f) => f.ruleId === 'JS-SQLI-001')).toBe(true);
+  });
+
+  it('TypeScript: BigInt や validator での検証後は無害化と判定する', async () => {
+    const code = `
+      import express from 'express';
+      import validator from 'validator';
+      const app = express();
+      app.get('/test', async (req, res) => {
+        const id = req.query.id as string;
+        await dataSource.query("SELECT * FROM users WHERE id = " + BigInt(id));
+        const safeId = validator.isUUID(id);
+        await dataSource.query("SELECT * FROM users WHERE id = " + safeId);
+      });
+    `;
+    const findings = await scanSource(code, 'test.ts');
+    expect(findings.filter((f) => f.ruleId === 'JS-SQLI-001')).toHaveLength(0);
+  });
+
+  it('Python: Django Model.objects.extra() を検出する', async () => {
+    const code = `
+      from flask import request
+      def search(user):
+        q = request.args["q"]
+        User.objects.extra(where=["name = '" + q + "'"])
+    `;
+    const findings = await scanSource(code, 'search.py');
+    expect(findings.some((f) => f.ruleId === 'PY-SQLI-001')).toBe(true);
+  });
+
+  it('PHP: Laravel Eloquent joinRaw() を検出する', async () => {
+    const code = `<?php
+      $table = $_GET['t'];
+      DB::table('users')->joinRaw("INNER JOIN " . $table . " ON users.id = t.user_id");
+    `;
+    const findings = await scanSource(code, 'index.php');
+    expect(findings.some((f) => f.ruleId === 'PHP-SQLI-001')).toBe(true);
+  });
+
+  it('TypeScript: Zod スキーマ検証 (z.number, z.coerce.number) や単項 + による数値化は無害化と判定する', async () => {
+    const code = `
+      import express from 'express';
+      import { z } from 'zod';
+      const app = express();
+      app.get('/test', async (req, res) => {
+        const numId = z.number().parse(req.query.id);
+        await dataSource.query("SELECT * FROM users WHERE id = " + numId);
+        const unaryId = +req.query.id;
+        await dataSource.query("SELECT * FROM users WHERE id = " + unaryId);
+      });
+    `;
+    const findings = await scanSource(code, 'test.ts');
+    expect(findings.filter((f) => f.ruleId === 'JS-SQLI-001')).toHaveLength(0);
+  });
+
+  it('Python: hashlib.hexdigest や datetime 変換後は無害化と判定する', async () => {
+    const code = `
+      from flask import request
+      import hashlib
+      import sqlite3
+      def view():
+        h = hashlib.sha256(request.args["q"].encode()).hexdigest()
+        sqlite3.connect("a.db").execute("SELECT * FROM t WHERE hash = '" + h + "'")
+    `;
+    const findings = await scanSource(code, 'hash.py');
+    expect(findings.filter((f) => f.ruleId === 'PY-SQLI-001')).toHaveLength(0);
+  });
+
+  it('PHP: filter_var(FILTER_VALIDATE_INT) や hash() は無害化と判定する', async () => {
+    const code = `<?php
+      $id = filter_var($_GET['id'], FILTER_VALIDATE_INT);
+      $h = hash('sha256', $_GET['token']);
+      $pdo->query("SELECT * FROM users WHERE id = " . $id . " AND token = '" . $h . "'");
+    `;
+    const findings = await scanSource(code, 'clean.php');
+    expect(findings.filter((f) => f.ruleId === 'PHP-SQLI-001')).toHaveLength(0);
+  });
+
+  it('Phase 2: LLM ツール呼び出し・関数引数を追跡し、危険な処理に渡すコードを LLM05 として検出する (TS)', async () => {
+    const code = `
+      export async function handleTool(toolCall: any) {
+        const query = toolCall.function.arguments;
+        await dataSource.query("SELECT * FROM users WHERE " + query);
+      }
+    `;
+    const findings = await scanSource(code, 'agent.ts');
+    expect(findings.some((f) => f.ruleId === 'LLM05-SQLI-001')).toBe(true);
+  });
+
+  it('Phase 2: Agent tool_input がコマンド実行に渡るコードを LLM05 として検出する (Python)', async () => {
+    const code = `
+      import subprocess
+      def execute_agent_step(action):
+        cmd = action.tool_input
+        subprocess.run(cmd, shell=True)
+    `;
+    const findings = await scanSource(code, 'agent.py');
+    expect(findings.some((f) => f.ruleId === 'LLM05-CMDI-001')).toBe(true);
+  });
+
+  it('Phase 2: MCP (Model Context Protocol) ツール引数が eval に渡るコードを検出する (TS)', async () => {
+    const code = `
+      export function onCallTool(request: any) {
+        const code = request.params.arguments.script;
+        eval(code);
+      }
+    `;
+    const findings = await scanSource(code, 'mcp-server.ts');
+    expect(findings.some((f) => f.ruleId === 'LLM05-CODEI-001')).toBe(true);
+  });
+});
+

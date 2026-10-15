@@ -1,3 +1,13 @@
+import {
+  JS_CRYPTO_HASH_REGEX,
+  JS_SAFE_PRIMITIVES_REGEX,
+  JS_VALIDATOR_SAFE_REGEX,
+  JS_YUP_SAFE_SCHEMA_REGEX,
+  JS_ZOD_SAFE_SCHEMA_REGEX,
+  JS_ZOD_SAFE_STRING_SCHEMA_REGEX,
+  LLM_TOOL_PATH_PATTERN,
+  MCP_TOOL_PARAM_PATTERN,
+} from '../constants';
 import { type CallInfo, type FileContext, type LanguageSpec, matchesCustom } from './spec';
 
 const USER_PATH = [
@@ -20,13 +30,13 @@ const LLM_CALL = [
   /^ollama\.(chat|generate)$/,
 ];
 const OLLAMA_METHOD = /^(chat|generate)$/;
-const LLM_RECEIVER = /(llm|chain|agent|model|chatModel|chat|executor|graph|runnable)$/i;
+const LLM_RECEIVER = /(llm|chain|agent|model|chatModel|chat|executor|graph|runnable|tool)$/i;
 const LLM_METHOD = /^(invoke|call|predict|stream|batch|run|generate)$/;
 
 const DB_RECEIVER =
-  /(^|_)(db|conn|connection|client|pool|database|knex|sequelize|tx|trx|pg|mysql|sqlite|sql|stmt|statement|queryRunner|manager|em|prisma|repo|repository|cursor|session)$/i;
+  /(^|_)(db|conn|connection|client|pool|database|knex|sequelize|tx|trx|pg|mysql|sqlite|sql|stmt|statement|queryRunner|manager|em|prisma|repo|repository|cursor|session|dataSource|datasource|appDataSource|dbClient)$/i;
 const SQL_GENERIC = /^(query|execute|exec|run|all|get|prepare|each)$/;
-const SQL_UNSAFE = /^(\$queryRawUnsafe|\$executeRawUnsafe|raw|whereRaw|orWhereRaw|orderByRaw|havingRaw|selectRaw|joinRaw|groupByRaw|unsafe)$/;
+const SQL_UNSAFE = /^(\$queryRawUnsafe|\$executeRawUnsafe|raw|rawQuery|executeRaw|whereRaw|orWhereRaw|orderByRaw|havingRaw|selectRaw|joinRaw|groupByRaw|unsafe)$/;
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -59,7 +69,11 @@ export const javascript: LanguageSpec = {
   commentPrefix: '//',
 
   sourceForPath(path) {
-    return USER_PATH.some((re) => re.test(path)) ? { kind: 'user', label: path } : null;
+    if (LLM_TOOL_PATH_PATTERN.test(path) || MCP_TOOL_PARAM_PATTERN.test(path)) {
+      return { kind: 'llm', label: path };
+    }
+    if (USER_PATH.some((re) => re.test(path))) return { kind: 'user', label: path };
+    return null;
   },
 
   sourceForCall(call, ctx) {
@@ -128,7 +142,11 @@ export const javascript: LanguageSpec = {
   sanitizerForCall(call, ctx) {
     const { path, name, receiver } = call;
     if (matchesCustom(path, ctx.customSanitizers)) return 'all';
-    if (/^(Number|parseInt|parseFloat|Boolean|isNaN|Number\.parseInt|Number\.parseFloat|Math\.\w+)$/.test(path)) return 'all';
+    if (JS_SAFE_PRIMITIVES_REGEX.test(path)) return 'all';
+    if (JS_VALIDATOR_SAFE_REGEX.test(path)) return 'all';
+    if (JS_ZOD_SAFE_SCHEMA_REGEX.test(path) || JS_ZOD_SAFE_STRING_SCHEMA_REGEX.test(path)) return 'all';
+    if (JS_YUP_SAFE_SCHEMA_REGEX.test(path)) return 'all';
+    if (JS_CRYPTO_HASH_REGEX.test(path) || (name === 'digest' && /hash|sha|md5|crypto/i.test(receiver))) return 'all';
     if (/^(encodeURIComponent|encodeURI|escape|escapeHtml|escapeHTML|sanitizeHtml|xss|filterXSS)$/.test(path)) return ['xss'];
     if (name === 'sanitize' || /^(he|validator|_|lodash|entities)\.(encode|escape|encodeHTML)$/.test(path)) return ['xss'];
     if ((name === 'escape' || name === 'escapeId' || name === 'format') && /mysql|SqlString|conn|connection|pool|db/i.test(receiver)) {

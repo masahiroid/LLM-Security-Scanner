@@ -8,6 +8,7 @@ import { getParser, languageForFile } from './parser';
 import { SUPPRESSION_RULE_ID } from './rules';
 import type { Confidence, Finding, LanguageId, ScanConfig } from './types';
 import { DEFAULT_CONFIG } from './config';
+import { CONFIDENCE_ORDER, FINGERPRINT_HASH_LENGTH, SUPPRESSION_COMMENT_PATTERN } from './constants';
 
 const SPECS: Record<LanguageId, LanguageSpec> = {
   python,
@@ -32,13 +33,10 @@ interface Suppression {
   length: number;
 }
 
-const SUPPRESS_RE = /llmscan-ignore(?:\[([^\]]*)\])?(?:\s*:\s*(.*))?/;
-
-/** 抑制コメントを読み取る。理由が空か TODO で始まるものは無効 */
 export function parseSuppressions(lines: string[]): Suppression[] {
   const out: Suppression[] = [];
   lines.forEach((text, line) => {
-    const m = SUPPRESS_RE.exec(text);
+    const m = SUPPRESSION_COMMENT_PATTERN.exec(text);
     if (!m) return;
     const rules = m[1] ? m[1].split(',').map((r) => r.trim()).filter(Boolean) : 'all';
     const reason = (m[2] ?? '').replace(/(\*\/|-->|\?>)\s*$/, '').trim();
@@ -62,7 +60,7 @@ export function fingerprintOf(f: Omit<Finding, 'fingerprint'>, relPath: string, 
   return createHash('sha256')
     .update(`${f.ruleId}|${relPath.replace(/\\/g, '/')}|${f.functionName}|${lineText}`)
     .digest('hex')
-    .slice(0, 32);
+    .slice(0, FINGERPRINT_HASH_LENGTH);
 }
 
 function memoizedMentions(text: string): (re: RegExp) => boolean {
@@ -76,8 +74,6 @@ function memoizedMentions(text: string): (re: RegExp) => boolean {
     return hit;
   };
 }
-
-const CONFIDENCE_ORDER: Record<Confidence, number> = { low: 0, medium: 1, high: 2 };
 
 export function meetsConfidence(f: Finding, min: Confidence): boolean {
   return CONFIDENCE_ORDER[f.confidence] >= CONFIDENCE_ORDER[min];

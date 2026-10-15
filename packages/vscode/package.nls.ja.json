@@ -1,0 +1,10 @@
+{
+  "llmscan.commands.scanWorkspace": "LLMScan: ワークスペース全体をスキャン",
+  "llmscan.commands.createBaseline": "LLMScan: 現在の指摘でベースラインを作成・更新",
+  "llmscan.commands.toggleFilter": "LLMScan: 高重大度フィルターの切り替え",
+  "llmscan.views.findings": "セキュリティ指摘一覧",
+  "llmscan.config.enable": "LLMScan によるセキュリティ検査を有効にする",
+  "llmscan.config.minConfidence": "表示する指摘の確信度の下限",
+  "llmscan.config.showBaselined": "ベースラインに登録済みの既存の指摘も表示する"
+}
+

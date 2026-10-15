@@ -7,10 +7,12 @@
     "packages/vscode"
   ],
   "scripts": {
-    "build": "npm run build -w @llmscan/cli -w llm-security-scanner",
+    "build": "npm run build -w @llmscan/cli -w llm-security-scan",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "scan": "node packages/cli/dist/cli.js scan"
+    "scan": "node packages/cli/dist/cli.js scan",
+    "package:extension": "npm run package -w llm-security-scan",
+    "publish:extension": "npm run publish -w llm-security-scan"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

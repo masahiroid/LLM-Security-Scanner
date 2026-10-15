@@ -1,3 +1,4 @@
+import { PHP_SAFE_FILTER_REGEX, PHP_SAFE_PRIMITIVES_REGEX } from '../constants';
 import { type CallInfo, type LanguageSpec, matchesCustom } from './spec';
 
 const SUPERGLOBALS = /^(_GET|_POST|_REQUEST|_COOKIE|_FILES|_SERVER|HTTP_RAW_POST_DATA)\b/;
@@ -8,7 +9,8 @@ const LLM_CALL = /(^|\.)(chat|completions|messages|responses)\.(create|createStr
 
 const SQL_FUNC_ARG0 = /^(mysql_query|sqlite_query|sqlite_exec)$/;
 const SQL_FUNC_ARG1 = /^(mysqli_query|mysqli_multi_query|mysqli_real_query|mysqli_prepare|pg_send_query|pg_prepare)$/;
-const SQL_METHOD = /^(query|exec|prepare|multi_query|real_query|unprepared|statement|whereRaw|orWhereRaw|selectRaw|orderByRaw|havingRaw|groupByRaw|raw|fromRaw)$/;
+const SQL_METHOD =
+  /^(query|exec|prepare|multi_query|real_query|unprepared|statement|whereRaw|orWhereRaw|selectRaw|orderByRaw|havingRaw|orHavingRaw|groupByRaw|joinRaw|leftJoinRaw|rightJoinRaw|raw|fromRaw)$/;
 
 const PROPAGATE_KEEP = new Set([
   'trim', 'ltrim', 'rtrim', 'strtolower', 'strtoupper', 'mb_strtolower', 'mb_strtoupper', 'substr',
@@ -67,8 +69,8 @@ export const php: LanguageSpec = {
   sanitizerForCall(call, ctx) {
     const { path, name } = call;
     if (matchesCustom(path, ctx.customSanitizers)) return 'all';
-    if (/^(intval|floatval|boolval|abs|count|ctype_digit|ctype_alnum|is_numeric|strlen|uniqid)$/.test(path)) return 'all';
-    if (/^filter_var$/.test(path) && /VALIDATE_(INT|FLOAT|BOOL)/.test(call.node.text)) return 'all';
+    if (PHP_SAFE_PRIMITIVES_REGEX.test(path)) return 'all';
+    if (/^filter_var$/.test(path) && PHP_SAFE_FILTER_REGEX.test(call.node.text)) return 'all';
     if (/^(htmlspecialchars|htmlentities|e|esc_html|esc_attr|esc_url|urlencode|rawurlencode|strip_tags)$/.test(path)) return ['xss'];
     if (/^(escapeshellarg|escapeshellcmd)$/.test(path)) return ['cmdi'];
     if (/^(mysqli_real_escape_string|pg_escape_string|pg_escape_literal|sqlite_escape_string)$/.test(path)) return ['sqli'];

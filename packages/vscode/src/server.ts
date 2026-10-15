@@ -2,13 +2,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   type Confidence,
-  type Finding,
-  KIND_META,
-  type LanguageId,
-  OWASP_A05,
-  OWASP_LLM05,
-  type ScanConfig,
   DEFAULT_CONFIG,
+  DEFAULT_DEBOUNCE_MS,
+  type Finding,
+  type LanguageId,
+  MAX_FILE_SIZE_BYTES,
+  type ScanConfig,
   collectFiles,
   createBaseline,
   createExcludeMatcher,
@@ -23,7 +22,6 @@ import {
   type CodeAction,
   CodeActionKind,
   type Diagnostic,
-  DiagnosticSeverity,
   type Hover,
   MarkupKind,
   ProposedFeatures,
@@ -33,10 +31,10 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { URI } from 'vscode-uri';
-
-const SCAN_WORKSPACE = 'llmscan.scanWorkspace';
-const CREATE_BASELINE = 'llmscan.createBaseline';
-const DEBOUNCE_MS = 300;
+import { buildCodeActions } from './server/code-actions';
+import { COMMAND_CREATE_BASELINE, COMMAND_SCAN_WORKSPACE, LANGUAGE_ID_MAP } from './server/constants';
+import { toDiagnostic } from './server/diagnostics';
+import { createHoverMarkdown } from './server/hover';
 
 interface Settings {
   enable: boolean;
@@ -60,18 +58,13 @@ let rootDirs: string[] = [];
 let settings: Settings = { enable: true, minConfidence: '', showBaselined: false };
 let supportsConfiguration = false;
 let supportsWorkspaceFolders = false;
+let clientLocale = '';
+const isJa = () => clientLocale.startsWith('ja') || (!clientLocale && (process.env.VSCODE_NLS_CONFIG?.includes('"locale":"ja"') ?? false));
 /** URI ごとの表示中の指摘（ホバー・コードアクション用） */
 const shown = new Map<string, Finding[]>();
 const timers = new Map<string, NodeJS.Timeout>();
 
-const LANGUAGE_IDS: Record<string, LanguageId> = {
-  python: 'python',
-  javascript: 'javascript',
-  javascriptreact: 'javascript',
-  typescript: 'typescript',
-  typescriptreact: 'tsx',
-  php: 'php',
-};
+const LANGUAGE_IDS = LANGUAGE_ID_MAP;
 
 // ---------------------------------------------------------------- 設定・ルート
 
@@ -120,30 +113,7 @@ async function refreshSettings(): Promise<void> {
 
 // ---------------------------------------------------------------- 診断
 
-const SEVERITY: Record<Finding['severity'], DiagnosticSeverity> = {
-  critical: DiagnosticSeverity.Error,
-  high: DiagnosticSeverity.Error,
-  medium: DiagnosticSeverity.Warning,
-  low: DiagnosticSeverity.Information,
-};
-const CONFIDENCE_LABEL: Record<Confidence, string> = { high: '高', medium: '中', low: '低' };
 
-function toDiagnostic(f: Finding, uri: string): Diagnostic {
-  const owasp = f.ruleId.startsWith('LLM05') ? OWASP_LLM05 : OWASP_A05;
-  return {
-    range: { start: { line: f.range.start.line, character: f.range.start.column }, end: { line: f.range.end.line, character: f.range.end.column } },
-    severity: SEVERITY[f.severity],
-    source: 'llmscan',
-    code: f.ruleId,
-    codeDescription: f.kind === 'suppression' ? undefined : { href: owasp.url },
-    message: f.kind === 'suppression' ? f.message : `${f.message}（確信度: ${CONFIDENCE_LABEL[f.confidence]}）`,
-    relatedInformation: f.trace.map((s) => ({
-      location: { uri, range: { start: { line: s.range.start.line, character: s.range.start.column }, end: { line: s.range.end.line, character: s.range.end.column } } },
-      message: s.message,
-    })),
-    data: { ruleId: f.ruleId, fingerprint: f.fingerprint, anchorLine: f.trace[f.trace.length - 1]?.range.start.line ?? f.range.start.line },
-  };
-}
 
 interface ScanTarget {
   uri: string;
@@ -193,7 +163,7 @@ function schedule(doc: TextDocument): void {
     setTimeout(() => {
       timers.delete(doc.uri);
       void validate(doc);
-    }, DEBOUNCE_MS),
+    }, DEFAULT_DEBOUNCE_MS),
   );
 }
 
@@ -217,7 +187,7 @@ function* workspaceFiles(): Generator<WorkspaceFile> {
       const uri = URI.file(file).toString();
       const open = documents.get(uri);
       const text = open?.getText() ?? fs.readFileSync(file, 'utf8');
-      if (text.length > 2_000_000) continue; // 巨大な生成ファイルは対象外
+      if (text.length > MAX_FILE_SIZE_BYTES) continue; // 巨大な生成ファイルは対象外
       yield { root, rel, target: { uri, file, text, languageId: open?.languageId } };
     }
   }
@@ -230,13 +200,19 @@ async function scanWorkspace(): Promise<{ files: number; findings: number }> {
     files++;
     total += await publish(target);
   }
-  connection.window.showInformationMessage(`LLM Security Scanner: ${files} ファイルをスキャンし、${total} 件の指摘がありました`);
+  const msg = isJa()
+    ? `LLMScan: ${files} ファイルをスキャンし、${total} 件の指摘がありました`
+    : `LLMScan: Scanned ${files} files, found ${total} findings`;
+  connection.window.showInformationMessage(msg);
   return { files, findings: total };
 }
 
 async function updateBaseline(): Promise<{ written: string[] }> {
   if (roots.length === 0) {
-    connection.window.showWarningMessage('LLM Security Scanner: ベースラインを作成するにはフォルダーを開いてください');
+    const msg = isJa()
+      ? 'LLMScan: ベースラインを作成するにはフォルダーを開いてください'
+      : 'LLMScan: Please open a folder to create a baseline';
+    connection.window.showWarningMessage(msg);
     return { written: [] };
   }
   const byRoot = new Map<Root, { finding: Finding; relativePath: string }[]>(roots.map((r) => [r, []]));
@@ -255,56 +231,20 @@ async function updateBaseline(): Promise<{ written: string[] }> {
     const file = path.resolve(root.dir, root.config.baseline);
     writeBaseline(file, createBaseline(mine));
     written.push(file);
-    connection.window.showInformationMessage(`LLM Security Scanner: ベースラインを更新しました（${mine.length} 件）: ${path.relative(root.dir, file)}`);
+    const msg = isJa()
+      ? `LLMScan: ベースラインを更新しました（${mine.length} 件）: ${path.relative(root.dir, file)}`
+      : `LLMScan: Updated baseline (${mine.length} findings): ${path.relative(root.dir, file)}`;
+    connection.window.showInformationMessage(msg);
   }
   reloadRoots();
   revalidateOpen();
   return { written };
 }
 
-// ---------------------------------------------------------------- ホバー・コードアクション
-
-function family(lang: LanguageId): 'python' | 'javascript' | 'php' {
-  return lang === 'python' ? 'python' : lang === 'php' ? 'php' : 'javascript';
-}
-
-function hoverMarkdown(f: Finding): string {
-  if (f.kind === 'suppression') return `**LLM Security Scanner** \`${f.ruleId}\`\n\n${f.message}`;
-  const meta = KIND_META[f.kind];
-  const llm = f.ruleId.startsWith('LLM05');
-  const owasp = llm ? OWASP_LLM05 : OWASP_A05;
-  const lines = [
-    `**LLM Security Scanner** \`${f.ruleId}\` — ${llm ? 'LLM05 不適切な出力処理 / ' : ''}${meta.title}`,
-    '',
-    `重大度: **${f.severity}** ／ 確信度: **${CONFIDENCE_LABEL[f.confidence]}**`,
-    '',
-    f.message,
-    '',
-    `**なぜ危険か** ${meta.why}`,
-  ];
-  if (llm) {
-    lines.push('', 'LLM の応答はプロンプトインジェクションで外部から操作できるため、ユーザー入力と同じく信頼できない値として扱ってください。');
-  }
-  lines.push('', `**安全な書き方** ${meta.fix[family(f.language)]}`, '', '**経路**');
-  for (const s of f.trace) lines.push(`1. ${s.range.start.line + 1} 行目: ${s.message.replace(/[*_`[\]]/g, '\\$&')}`);
-  lines.push('', `[${owasp.id} ${owasp.title}](${owasp.url}) ／ ${meta.cwe}`);
-  return lines.join('\n');
-}
-
-function suppressionEdit(doc: TextDocument, line: number, ruleId: string, lang: LanguageId) {
-  const text = doc.getText({ start: { line, character: 0 }, end: { line, character: Number.MAX_SAFE_INTEGER } });
-  const indent = /^\s*/.exec(text)?.[0] ?? '';
-  const body = `llmscan-ignore[${ruleId}]: TODO 理由を記入`;
-  let comment: string;
-  if (lang === 'python') comment = `# ${body}`;
-  else if (lang === 'php' && text.trimStart().startsWith('<')) comment = `<?php // ${body} ?>`;
-  else comment = `// ${body}`;
-  return { range: { start: { line, character: 0 }, end: { line, character: 0 } }, newText: `${indent}${comment}\n` };
-}
-
 // ---------------------------------------------------------------- LSP
 
 connection.onInitialize(async (params) => {
+  clientLocale = params.locale ?? '';
   supportsConfiguration = params.capabilities.workspace?.configuration === true;
   supportsWorkspaceFolders = params.capabilities.workspace?.workspaceFolders === true;
   const folders = params.workspaceFolders?.map((f) => URI.parse(f.uri).fsPath) ?? [];
@@ -317,7 +257,7 @@ connection.onInitialize(async (params) => {
       textDocumentSync: TextDocumentSyncKind.Incremental,
       hoverProvider: true,
       codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix] },
-      executeCommandProvider: { commands: [SCAN_WORKSPACE, CREATE_BASELINE] },
+      executeCommandProvider: { commands: [COMMAND_SCAN_WORKSPACE, COMMAND_CREATE_BASELINE] },
       workspace: { workspaceFolders: { supported: true, changeNotifications: true } },
     },
   };
@@ -363,7 +303,7 @@ connection.onHover((params): Hover | null => {
     return afterStart && beforeEnd;
   });
   if (hits.length === 0) return null;
-  return { contents: { kind: MarkupKind.Markdown, value: hits.map(hoverMarkdown).join('\n\n---\n\n') } };
+  return { contents: { kind: MarkupKind.Markdown, value: hits.map(createHoverMarkdown).join('\n\n---\n\n') } };
 });
 
 connection.onCodeAction((params): CodeAction[] => {
@@ -371,23 +311,12 @@ connection.onCodeAction((params): CodeAction[] => {
   if (!doc) return [];
   const lang = LANGUAGE_IDS[doc.languageId];
   if (!lang) return [];
-  const actions: CodeAction[] = [];
-  for (const d of params.context.diagnostics) {
-    if (d.source !== 'llmscan' || !d.data || d.code === 'LLMSCAN-SUPPRESS-001') continue;
-    const { ruleId, anchorLine } = d.data as { ruleId: string; anchorLine: number };
-    actions.push({
-      title: `LLM Security Scanner: ${ruleId} をこの箇所で抑制する（理由の記入が必要）`,
-      kind: CodeActionKind.QuickFix,
-      diagnostics: [d],
-      edit: { changes: { [doc.uri]: [suppressionEdit(doc, anchorLine, ruleId, lang)] } },
-    });
-  }
-  return actions;
+  return buildCodeActions(doc, params.context.diagnostics, lang);
 });
 
 connection.onExecuteCommand(async (params) => {
-  if (params.command === SCAN_WORKSPACE) return scanWorkspace();
-  if (params.command === CREATE_BASELINE) return updateBaseline();
+  if (params.command === COMMAND_SCAN_WORKSPACE) return scanWorkspace();
+  if (params.command === COMMAND_CREATE_BASELINE) return updateBaseline();
   return undefined;
 });
 

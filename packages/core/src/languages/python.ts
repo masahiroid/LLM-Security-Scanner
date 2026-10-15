@@ -1,3 +1,13 @@
+import {
+  LLM_TOOL_PATH_PATTERN,
+  MCP_TOOL_PARAM_PATTERN,
+  PY_SAFE_CRYPTO_REGEX,
+  PY_SAFE_DATETIME_REGEX,
+  PY_SAFE_IP_REGEX,
+  PY_SAFE_MATH_REGEX,
+  PY_SAFE_PRIMITIVES_REGEX,
+  PY_SAFE_SCHEMA_REGEX,
+} from '../constants';
 import { type CallInfo, type LanguageSpec, matchesCustom } from './spec';
 
 const USER_PATH =
@@ -13,7 +23,7 @@ const LLM_CALL = [
   /^ollama\.(chat|generate|achat|agenerate)$/,
 ];
 
-const LLM_RECEIVER = /(llm|chain|agent|chat_model|chat|executor|graph|runnable|crew|query_engine|chat_engine)$/i;
+const LLM_RECEIVER = /(llm|chain|agent|chat_model|chat|executor|graph|runnable|crew|query_engine|chat_engine|tool)$/i;
 const LLM_METHOD = /^(invoke|ainvoke|predict|apredict|run|arun|generate|agenerate|stream|astream|batch|abatch|kickoff|query|aquery|chat|achat)$/;
 
 const DB_RECEIVER = /^(c|cur|con|tx|txn)$|cursor|conn|db|session|engine|database|transaction/i;
@@ -39,7 +49,11 @@ export const python: LanguageSpec = {
   commentPrefix: '#',
 
   sourceForPath(path) {
-    return USER_PATH.test(path) ? { kind: 'user', label: path } : null;
+    if (LLM_TOOL_PATH_PATTERN.test(path) || MCP_TOOL_PARAM_PATTERN.test(path)) {
+      return { kind: 'llm', label: path };
+    }
+    if (USER_PATH.test(path)) return { kind: 'user', label: path };
+    return null;
   },
 
   sourceForCall(call, ctx) {
@@ -66,8 +80,12 @@ export const python: LanguageSpec = {
       return { kind: 'sqli', args: first };
     }
     if (name === 'raw' && /objects$/.test(receiver)) return { kind: 'sqli', args: first };
+    if (name === 'extra' && (/objects|filter|all|select_related/.test(receiver) || call.kwargs.has('where'))) {
+      const whereArg = call.kwargs.get('where');
+      return { kind: 'sqli', args: whereArg ? [whereArg] : first };
+    }
     if (/(^|\.)(read_sql|read_sql_query)$/.test(path)) return { kind: 'sqli', args: first };
-    if (/(^|\.)RawSQL$/.test(path)) return { kind: 'sqli', args: first };
+    if (/(^|\.)(RawSQL|SQL)$/.test(path)) return { kind: 'sqli', args: first };
     if (/^(sqlalchemy\.|sa\.)?text$/.test(path) && ctx.mentions(/sqlalchemy/)) {
       return { kind: 'sqli', args: first };
     }
@@ -112,7 +130,12 @@ export const python: LanguageSpec = {
   sanitizerForCall(call, ctx) {
     const { path } = call;
     if (matchesCustom(path, ctx.customSanitizers)) return 'all';
-    if (/^(int|float|bool|len|abs|round|uuid\.UUID|UUID|ord|hash|id|isinstance|callable)$/.test(path)) return 'all';
+    if (PY_SAFE_PRIMITIVES_REGEX.test(path)) return 'all';
+    if (PY_SAFE_MATH_REGEX.test(path)) return 'all';
+    if (PY_SAFE_IP_REGEX.test(path)) return 'all';
+    if (PY_SAFE_DATETIME_REGEX.test(path)) return 'all';
+    if (PY_SAFE_CRYPTO_REGEX.test(path)) return 'all';
+    if (PY_SAFE_SCHEMA_REGEX.test(path)) return 'all';
     if ((/(^|\.)(escape|conditional_escape|escape_html)$/.test(path) && !/^re\./.test(path)) || /^bleach\.clean$/.test(path)) {
       return ['xss'];
     }

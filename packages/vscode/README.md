@@ -1,35 +1,86 @@
-# LLM Security Scanner
+# LLMScan - AI Security Scanner
 
-Python / TypeScript / JavaScript / PHP のコードを編集中に解析し、次の問題を波線で示します。
+English | [日本語 (Japanese)](README.ja.md)
 
-- **インジェクション（OWASP A05）**：SQL インジェクション、OS コマンド、コード実行（eval 等）、安全でないデシリアライズ、XSS、テンプレートインジェクション、ファイルインクルード
-- **LLM の応答を危険な処理に渡すコード（OWASP LLM05 不適切な出力処理）**：OpenAI / Anthropic / Vercel AI SDK / LangChain 等の応答を SQL・eval・シェル・innerHTML に渡している箇所
+**Local Static Application Security Testing (SAST) for AI & Web Applications**
 
-すべてローカルで解析し、コードを外部に送信しません（信頼されていないワークスペースでも動作します）。
+LLMScan analyzes **Python**, **TypeScript**, **JavaScript**, and **PHP** source code in real time as you edit. It traces data flow from untrusted sources to dangerous sinks, detecting both traditional web vulnerabilities (**OWASP Top 10**) and LLM-specific security threats (**OWASP LLM Top 10 - LLM05: Insecure Output Handling**).
 
-## 使い方
+All scans run **100% locally** inside your editor using Tree-sitter WebAssembly. **Zero code is sent to external servers**, making it fully safe for proprietary codebases and untrusted workspaces.
 
-| 機能 | 操作 |
+---
+
+## 🌟 Key Features
+
+- **Injection Vulnerability Detection (OWASP A05)**:
+  SQL Injection (Raw ORM & parameterized queries), Command Injection (`exec`, `spawn`, `shell=True`), Code Injection (`eval`, `new Function`), Insecure Deserialization (`pickle`, `unserialize`, `yaml.unsafe_load`), Cross-Site Scripting (XSS), Server-Side Template Injection (SSTI), and Path Traversal / File Inclusion.
+- **OWASP LLM05 (Insecure Output Handling) & Agentic Security**:
+  Tracks responses from OpenAI, Anthropic, Gemini, Ollama, LangChain, LlamaIndex, and Vercel AI SDK, as well as AI Agent tool calls (`tool_call.function.arguments`, `tool_input`) and **Model Context Protocol (MCP)** tool handlers (`request.params.arguments`) directly to dangerous sinks (`innerHTML`, `sqlite3.execute`, `subprocess.run`, `eval`).
+- **Interactive Tree View & Activity Bar**:
+  Dedicated Activity Bar icon (`llm.svg`) and sidebar view with severity badges, line-by-line navigation, and a quick toggle filter for High/Critical issues.
+- **Intelligent Taint Tracking & Sanitizers**:
+  Built-in understanding of safe sanitizers: Zod schema validation, Yup, Pydantic, cryptographic hash digests (`hashlib`, `crypto.createHash`, `bin2hex`), and type coercion (`+x`, `Number()`, `int()`, `filter_var`).
+- **Actionable Hovers & QuickFix**:
+  Hover over any wavy line to see the vulnerability explanation, language-specific remediation examples, complete taint propagation trace, and OWASP/CWE references. Insert reason-enforced suppression comments with one click (`QuickFix`).
+- **Baseline Support**:
+  Create `.llmscan-baseline.json` to suppress legacy technical debt and only alert on newly introduced vulnerabilities.
+
+---
+
+## 📖 Usage
+
+| Feature | Action |
 |---|---|
-| 指摘の表示 | 対象言語のファイルを開くと自動で解析。問題パネルにも表示されます |
-| 経路の確認 | 指摘の「関連情報」に「入力の出どころ → 代入 → 危険な処理」が並びます |
-| 説明 | 指摘にカーソルを合わせると、危険な理由・安全な書き方・OWASP / CWE へのリンクを表示 |
-| 抑制 | 電球メニュー「この箇所で抑制する」→ 挿入されたコメントの `TODO 理由を記入` を理由に書き換えます（理由のない抑制は無効） |
-| 全体スキャン | コマンドパレット「LLM Security Scanner: ワークスペース全体をスキャン」 |
-| 既存の指摘を除外 | 「LLM Security Scanner: 現在の指摘でベースラインを作成・更新」。以後は新しく増えた指摘だけを表示します |
+| **Real-time Diagnostics** | Automatically scans active files and highlights vulnerabilities in the Problems panel and editor squiggly lines. |
+| **Dataflow Trace** | Under "Related Information", view the complete path: `Source -> Assignment -> Sink`. |
+| **Detailed Explanation** | Hover over findings to view why it is dangerous, safe remediation code, and CWE links. |
+| **Suppression** | Click the QuickFix lightbulb to insert `# llmscan-ignore[RULE]: TODO Reason`. |
+| **Workspace Scan** | Run `LLMScan: Scan entire workspace` from the Command Palette or Activity Bar. |
+| **Baseline Filtering** | Run `LLMScan: Create or update baseline with current findings` to ignore existing alerts. |
 
-## 設定
+---
 
-リポジトリ直下の `.llmscan.yml`（CLI と共通）：
+## ⚙️ Configuration
+
+You can configure options in `.llmscan.yml` at the repository root (shared with the CI CLI) or via VS Code Settings:
 
 ```yaml
+# .llmscan.yml
 minConfidence: medium        # low | medium | high
-failOn: high                 # CLI の失敗条件
+failOn: high                 # Failure threshold for CI CLI
 baseline: .llmscan-baseline.json
-exclude: ["**/tests/**"]
-sanitizers:                  # 自作のエスケープ・検証関数（別ファイルで定義したもの）
-  php: ["h"]
-  python: ["app.security.escape_sql_identifier"]
+exclude:
+  - "**/tests/**"
+  - "**/generated/**"
+sanitizers:                  # Custom sanitization functions defined in your project
+  javascript: ["mySanitizer"]
+  python: ["app.security.sanitize_query"]
+  php: ["clean_input"]
 ```
 
-VS Code の設定：`llmscan.enable` / `llmscan.minConfidence` / `llmscan.showBaselined`
+### VS Code Settings (`settings.json`)
+- `llmscan.enable`: Enable or disable LLMScan security analysis. (Default: `true`)
+- `llmscan.minConfidence`: Filter findings by minimum confidence level (`low`, `medium`, `high`).
+- `llmscan.showBaselined`: Whether to display existing findings recorded in the baseline file. (Default: `false`)
+
+---
+
+## 🛡️ Supported Rules
+
+| Rule ID | Category | Severity |
+|---|---|---|
+| `{PY,JS,PHP}-SQLI-001` | SQL Injection | High |
+| `{PY,JS,PHP}-CMDI-001` | OS Command Injection | Critical |
+| `{PY,JS,PHP}-CODEI-001` | Code Injection (`eval` / `new Function`) | Critical |
+| `{PY,JS,PHP}-DESER-001` | Insecure Deserialization (`pickle`, `unserialize`) | High |
+| `{PY,JS}-SSTI-001` | Server-Side Template Injection | High |
+| `{PY,JS,PHP}-XSS-001` | Cross-Site Scripting (`innerHTML`, `echo`) | Medium |
+| `PHP-FILEINC-001` | File Inclusion (`include`, `require`) | High |
+| `LLM05-*-001` | **OWASP LLM05** Insecure LLM Output Handling | Critical / High |
+| `LLMSCAN-SUPPRESS-001` | Suppression comment without reason | Low |
+
+---
+
+## 🔒 Privacy & Local Processing
+
+LLMScan is built on local Tree-sitter WebAssembly grammar parsers. **No source code, file paths, or telemetry are ever transmitted across the network.** It functions completely offline and in air-gapped environments.

@@ -1,4 +1,10 @@
 **
 !dist/**
 !package.json
+!package.nls.json
+!package.nls.ja.json
+!readme.md
 !README.md
+!README.ja.md
+!icon.png
+!media/**

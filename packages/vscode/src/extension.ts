@@ -2,11 +2,15 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions, TransportKind } from 'vscode-languageclient/node';
 
+import { registerFindingsView } from './tree';
+
 let client: LanguageClient | undefined;
 
 const LANGUAGES = ['python', 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'php'];
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  registerFindingsView(context);
+
   const module = context.asAbsolutePath(path.join('dist', 'server.js'));
   const serverOptions: ServerOptions = {
     run: { module, transport: TransportKind.ipc },
