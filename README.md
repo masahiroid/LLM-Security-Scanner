@@ -56,7 +56,7 @@ Package and install the extension locally:
 
 ```bash
 npm run package:extension
-code --install-extension packages/vscode/llm-security-scan-1.2.0.vsix
+code --install-extension packages/vscode/llm-security-scan-1.3.0.vsix
 ```
 
 See [packages/vscode/README.md](packages/vscode/README.md) for full extension documentation.

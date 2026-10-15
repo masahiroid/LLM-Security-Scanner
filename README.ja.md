@@ -58,7 +58,7 @@ npm run build        # 全パッケージのビルド
 
 ```bash
 npm run package:extension
-code --install-extension packages/vscode/llm-security-scan-1.2.0.vsix
+code --install-extension packages/vscode/llm-security-scan-1.3.0.vsix
 ```
 
 詳細な機能や画面操作については [packages/vscode/README.ja.md](packages/vscode/README.ja.md) をご覧ください。

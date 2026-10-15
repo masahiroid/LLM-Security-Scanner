@@ -34,9 +34,12 @@ All scans run **100% locally** inside your editor using Tree-sitter WebAssembly.
 | **Real-time Diagnostics** | Automatically scans active files and highlights vulnerabilities in the Problems panel and editor squiggly lines. |
 | **Dataflow Trace** | Under "Related Information", view the complete path: `Source -> Assignment -> Sink`. |
 | **Detailed Explanation** | Hover over findings to view why it is dangerous, safe remediation code, and CWE links. |
+| **Copy for AI Fix** | Click the `$(copy)` button in the sidebar title to copy all findings formatted as an AI remediation prompt (Markdown) directly to clipboard. |
+| **Open Report in Tab** | Click the `$(output)` button in the sidebar title to open the findings report in a new Markdown editor tab. |
+| **Clear Scan Results** | Click the `$(clear-all)` button to clear whole-workspace scan results and reset the view back to only open files. |
 | **Suppression** | Click the QuickFix lightbulb to insert `# llmscan-ignore[RULE]: TODO Reason`. |
-| **Workspace Scan** | Run `LLMScan: Scan entire workspace` from the Command Palette or Activity Bar. |
-| **Baseline Filtering** | Run `LLMScan: Create or update baseline with current findings` to ignore existing alerts. |
+| **Workspace Scan** | Click the `$(refresh)` button or run `LLMScan: Scan entire workspace` from the Command Palette. |
+| **Baseline / Reset** | Run `Create baseline` to ignore existing alerts, or `Clear baseline` to restore and view all findings again. |
 
 ---
 

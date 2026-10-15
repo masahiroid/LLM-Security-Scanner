@@ -2,7 +2,7 @@
   "name": "llm-security-scan",
   "displayName": "LLMScan - AI Security Scanner",
   "description": "Bilingual (EN/JA) local static security scanner for Python, TypeScript, JavaScript, and PHP. Detects code/SQL injection and OWASP LLM05.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "publisher": "masahirocom",
   "icon": "icon.png",
   "private": true,
@@ -64,7 +64,7 @@
     "viewsWelcome": [
       {
         "view": "llmscan.findings",
-        "contents": "Detect security issues in your workspace.\n[Scan Workspace](command:llmscan.scanWorkspace)\n[Create / Update Baseline](command:llmscan.createBaseline)"
+        "contents": "Detect security issues in your workspace.\n[Scan Workspace](command:llmscan.scanWorkspace)\n[Copy for AI Fix](command:llmscan.copyFindings)\n[Clear Scan](command:llmscan.clearScan)"
       }
     ],
     "commands": [
@@ -75,16 +75,40 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "llmscan.createBaseline",
-        "title": "%llmscan.commands.createBaseline%",
+        "command": "llmscan.clearScan",
+        "title": "%llmscan.commands.clearScan%",
         "category": "LLMScan",
-        "icon": "$(check-all)"
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "llmscan.copyFindings",
+        "title": "%llmscan.commands.copyFindings%",
+        "category": "LLMScan",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "llmscan.exportReport",
+        "title": "%llmscan.commands.exportReport%",
+        "category": "LLMScan",
+        "icon": "$(output)"
       },
       {
         "command": "llmscan.toggleFilter",
         "title": "%llmscan.commands.toggleFilter%",
         "category": "LLMScan",
         "icon": "$(filter)"
+      },
+      {
+        "command": "llmscan.createBaseline",
+        "title": "%llmscan.commands.createBaseline%",
+        "category": "LLMScan",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "llmscan.clearBaseline",
+        "title": "%llmscan.commands.clearBaseline%",
+        "category": "LLMScan",
+        "icon": "$(discard)"
       }
     ],
     "menus": {
@@ -95,14 +119,29 @@
           "group": "navigation@1"
         },
         {
-          "command": "llmscan.createBaseline",
+          "command": "llmscan.clearScan",
           "when": "view == llmscan.findings",
           "group": "navigation@2"
         },
         {
-          "command": "llmscan.toggleFilter",
+          "command": "llmscan.copyFindings",
           "when": "view == llmscan.findings",
           "group": "navigation@3"
+        },
+        {
+          "command": "llmscan.exportReport",
+          "when": "view == llmscan.findings",
+          "group": "navigation@4"
+        },
+        {
+          "command": "llmscan.toggleFilter",
+          "when": "view == llmscan.findings",
+          "group": "navigation@5"
+        },
+        {
+          "command": "llmscan.createBaseline",
+          "when": "view == llmscan.findings",
+          "group": "navigation@6"
         }
       ]
     },
@@ -145,7 +184,7 @@
     "publish": "npm run build && vsce publish --no-dependencies --skip-license"
   },
   "dependencies": {
-    "@llmscan/core": "1.2.0",
+    "@llmscan/core": "1.3.0",
     "vscode-languageclient": "9.0.1",
     "vscode-languageserver": "9.0.1",
     "vscode-languageserver-textdocument": "1.0.12",

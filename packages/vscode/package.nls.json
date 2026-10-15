@@ -1,7 +1,11 @@
 {
   "llmscan.commands.scanWorkspace": "LLMScan: Scan entire workspace",
-  "llmscan.commands.createBaseline": "LLMScan: Create or update baseline with current findings",
+  "llmscan.commands.clearScan": "LLMScan: Clear scan results (Reset to open files)",
+  "llmscan.commands.copyFindings": "LLMScan: Copy all findings as AI prompt (Markdown)",
+  "llmscan.commands.exportReport": "LLMScan: Open findings report in new tab",
   "llmscan.commands.toggleFilter": "LLMScan: Toggle High/Critical severity filter",
+  "llmscan.commands.createBaseline": "LLMScan: Create or update baseline with current findings",
+  "llmscan.commands.clearBaseline": "LLMScan: Clear baseline (Restore all findings)",
   "llmscan.views.findings": "Security Findings",
   "llmscan.config.enable": "Enable or disable LLMScan security analysis",
   "llmscan.config.minConfidence": "Minimum confidence level to display",

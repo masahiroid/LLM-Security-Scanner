@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SUPPRESSION_RULE_ID } from '@llmscan/core';
+import { collectReportItems, generateAiRemediationPrompt } from './report';
 
 export class FindingsTreeItem extends vscode.TreeItem {
   constructor(
@@ -177,9 +178,38 @@ export function registerFindingsView(context: vscode.ExtensionContext): vscode.T
     vscode.window.showInformationMessage(msg);
   });
 
+  const copyFindingsCmd = vscode.commands.registerCommand('llmscan.copyFindings', async () => {
+    const isJa = vscode.env.language.startsWith('ja');
+    const items = collectReportItems(vscode, provider.isHighOnly());
+    if (items.length === 0) {
+      const msg = isJa ? 'LLMScan: コピー対象のセキュリティ指摘はありません' : 'LLMScan: No security findings to copy';
+      vscode.window.showInformationMessage(msg);
+      return;
+    }
+    const markdown = generateAiRemediationPrompt(items, isJa);
+    await vscode.env.clipboard.writeText(markdown);
+    const msg = isJa
+      ? `LLMScan: ${items.length} 件の指摘を AI 修正用プロンプト（Markdown）としてクリップボードにコピーしました`
+      : `LLMScan: Copied ${items.length} findings to clipboard as AI remediation prompt`;
+    vscode.window.showInformationMessage(msg);
+  });
+
+  const exportReportCmd = vscode.commands.registerCommand('llmscan.exportReport', async () => {
+    const isJa = vscode.env.language.startsWith('ja');
+    const items = collectReportItems(vscode, provider.isHighOnly());
+    const markdown = generateAiRemediationPrompt(items, isJa);
+    const doc = await vscode.workspace.openTextDocument({
+      content: markdown,
+      language: 'markdown',
+    });
+    await vscode.window.showTextDocument(doc, { preview: false });
+  });
+
   context.subscriptions.push(
     treeView,
     toggleFilterCmd,
+    copyFindingsCmd,
+    exportReportCmd,
     vscode.languages.onDidChangeDiagnostics(() => updateBadge()),
   );
 

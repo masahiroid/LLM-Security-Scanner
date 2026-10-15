@@ -1,7 +1,11 @@
 {
   "llmscan.commands.scanWorkspace": "LLMScan: ワークスペース全体をスキャン",
-  "llmscan.commands.createBaseline": "LLMScan: 現在の指摘でベースラインを作成・更新",
+  "llmscan.commands.clearScan": "LLMScan: スキャン結果をクリア（開いているファイルのみに戻す）",
+  "llmscan.commands.copyFindings": "LLMScan: AI修正用に指摘一覧をMarkdown形式でコピー",
+  "llmscan.commands.exportReport": "LLMScan: 指摘一覧レポートを新しいタブで開く",
   "llmscan.commands.toggleFilter": "LLMScan: 高重大度フィルターの切り替え",
+  "llmscan.commands.createBaseline": "LLMScan: 現在の指摘でベースラインを作成・更新",
+  "llmscan.commands.clearBaseline": "LLMScan: ベースラインを解除（すべての指摘を再表示）",
   "llmscan.views.findings": "セキュリティ指摘一覧",
   "llmscan.config.enable": "LLMScan によるセキュリティ検査を有効にする",
   "llmscan.config.minConfidence": "表示する指摘の確信度の下限",

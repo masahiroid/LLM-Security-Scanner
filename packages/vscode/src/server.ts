@@ -32,7 +32,13 @@ import {
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { URI } from 'vscode-uri';
 import { buildCodeActions } from './server/code-actions';
-import { COMMAND_CREATE_BASELINE, COMMAND_SCAN_WORKSPACE, LANGUAGE_ID_MAP } from './server/constants';
+import {
+  COMMAND_CLEAR_BASELINE,
+  COMMAND_CLEAR_SCAN,
+  COMMAND_CREATE_BASELINE,
+  COMMAND_SCAN_WORKSPACE,
+  LANGUAGE_ID_MAP,
+} from './server/constants';
 import { toDiagnostic } from './server/diagnostics';
 import { createHoverMarkdown } from './server/hover';
 
@@ -241,6 +247,45 @@ async function updateBaseline(): Promise<{ written: string[] }> {
   return { written };
 }
 
+function clearScan(): { cleared: number } {
+  let cleared = 0;
+  const openUris = new Set(documents.all().map((d) => d.uri));
+  for (const uri of Array.from(shown.keys())) {
+    if (!openUris.has(uri)) {
+      shown.delete(uri);
+      void connection.sendDiagnostics({ uri, diagnostics: [] });
+      cleared++;
+    }
+  }
+  const msg = isJa()
+    ? `LLMScan: スキャン結果をクリアしました（未編集の ${cleared} ファイルの指摘を非表示にしました）`
+    : `LLMScan: Cleared scan results (${cleared} closed files reset)`;
+  connection.window.showInformationMessage(msg);
+  return { cleared };
+}
+
+function clearBaseline(): { cleared: string[] } {
+  const cleared: string[] = [];
+  for (const root of roots) {
+    const file = path.resolve(root.dir, root.config.baseline);
+    if (fs.existsSync(file)) {
+      try {
+        fs.unlinkSync(file);
+        cleared.push(file);
+      } catch (e) {
+        connection.window.showErrorMessage(`LLMScan: Failed to remove baseline: ${(e as Error).message}`);
+      }
+    }
+  }
+  reloadRoots();
+  revalidateOpen();
+  const msg = isJa()
+    ? `LLMScan: ベースラインを解除しました（${cleared.length} 個のファイルを削除）。すべての指摘を再表示します`
+    : `LLMScan: Cleared baseline (${cleared.length} files removed). Showing all findings again`;
+  connection.window.showInformationMessage(msg);
+  return { cleared };
+}
+
 // ---------------------------------------------------------------- LSP
 
 connection.onInitialize(async (params) => {
@@ -257,7 +302,14 @@ connection.onInitialize(async (params) => {
       textDocumentSync: TextDocumentSyncKind.Incremental,
       hoverProvider: true,
       codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix] },
-      executeCommandProvider: { commands: [COMMAND_SCAN_WORKSPACE, COMMAND_CREATE_BASELINE] },
+      executeCommandProvider: {
+        commands: [
+          COMMAND_SCAN_WORKSPACE,
+          COMMAND_CREATE_BASELINE,
+          COMMAND_CLEAR_SCAN,
+          COMMAND_CLEAR_BASELINE,
+        ],
+      },
       workspace: { workspaceFolders: { supported: true, changeNotifications: true } },
     },
   };
@@ -317,6 +369,8 @@ connection.onCodeAction((params): CodeAction[] => {
 connection.onExecuteCommand(async (params) => {
   if (params.command === COMMAND_SCAN_WORKSPACE) return scanWorkspace();
   if (params.command === COMMAND_CREATE_BASELINE) return updateBaseline();
+  if (params.command === COMMAND_CLEAR_SCAN) return clearScan();
+  if (params.command === COMMAND_CLEAR_BASELINE) return clearBaseline();
   return undefined;
 });
 
