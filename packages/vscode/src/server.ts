@@ -210,6 +210,7 @@ async function scanWorkspace(): Promise<{ files: number; findings: number }> {
     ? `LLMScan: ${files} ファイルをスキャンし、${total} 件の指摘がありました`
     : `LLMScan: Scanned ${files} files, found ${total} findings`;
   connection.window.showInformationMessage(msg);
+  void connection.sendNotification('llmscan/scanCompleted', { total, files });
   return { files, findings: total };
 }
 
@@ -261,6 +262,7 @@ function clearScan(): { cleared: number } {
     ? `LLMScan: スキャン結果をクリアしました（未編集の ${cleared} ファイルの指摘を非表示にしました）`
     : `LLMScan: Cleared scan results (${cleared} closed files reset)`;
   connection.window.showInformationMessage(msg);
+  void connection.sendNotification('llmscan/scanCleared', { cleared });
   return { cleared };
 }
 

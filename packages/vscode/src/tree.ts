@@ -18,11 +18,22 @@ export class FindingsTreeDataProvider implements vscode.TreeDataProvider<Finding
   private _onDidChangeTreeData = new vscode.EventEmitter<FindingsTreeItem | undefined | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
   private highOnlyFilter = false;
+  private scanState: { scanned: boolean; totalFiles: number } = { scanned: false, totalFiles: 0 };
 
   constructor() {
     vscode.languages.onDidChangeDiagnostics(() => {
       this._onDidChangeTreeData.fire();
     });
+  }
+
+  markScanned(totalFiles: number): void {
+    this.scanState = { scanned: true, totalFiles };
+    this._onDidChangeTreeData.fire();
+  }
+
+  resetScanned(): void {
+    this.scanState = { scanned: false, totalFiles: 0 };
+    this._onDidChangeTreeData.fire();
   }
 
   toggleFilter(): boolean {
@@ -59,6 +70,17 @@ export class FindingsTreeDataProvider implements vscode.TreeDataProvider<Finding
         );
 
       if (fileDiagnostics.length === 0) {
+        if (this.scanState.scanned) {
+          const item = new FindingsTreeItem(
+            isJa ? '脆弱性は検出されませんでした' : 'No vulnerabilities detected',
+            vscode.TreeItemCollapsibleState.None,
+          );
+          item.description = isJa
+            ? `${this.scanState.totalFiles} ファイルを検査完了（安全です）`
+            : `${this.scanState.totalFiles} files scanned (Secure)`;
+          item.iconPath = new vscode.ThemeIcon('pass', new vscode.ThemeColor('testing.iconPassed'));
+          return [item];
+        }
         return [];
       }
 
@@ -148,7 +170,10 @@ export class FindingsTreeDataProvider implements vscode.TreeDataProvider<Finding
   }
 }
 
-export function registerFindingsView(context: vscode.ExtensionContext): vscode.TreeView<FindingsTreeItem> {
+export function registerFindingsView(context: vscode.ExtensionContext): {
+  treeView: vscode.TreeView<FindingsTreeItem>;
+  provider: FindingsTreeDataProvider;
+} {
   const provider = new FindingsTreeDataProvider();
   const treeView = vscode.window.createTreeView('llmscan.findings', {
     treeDataProvider: provider,
@@ -214,5 +239,5 @@ export function registerFindingsView(context: vscode.ExtensionContext): vscode.T
   );
 
   updateBadge();
-  return treeView;
+  return { treeView, provider };
 }

@@ -9,7 +9,7 @@ let client: LanguageClient | undefined;
 const LANGUAGES = ['python', 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'php'];
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  registerFindingsView(context);
+  const { provider } = registerFindingsView(context);
 
   const module = context.asAbsolutePath(path.join('dist', 'server.js'));
   const serverOptions: ServerOptions = {
@@ -30,6 +30,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   client = new LanguageClient('llmscan', 'LLM Security Scanner', serverOptions, clientOptions);
   // llmscan.scanWorkspace / llmscan.createBaseline は Language Server の executeCommand として登録される
   await client.start();
+
+  client.onNotification('llmscan/scanCompleted', (p: { total: number; files: number }) => {
+    provider.markScanned(p.files);
+  });
+  client.onNotification('llmscan/scanCleared', () => {
+    provider.resetScanned();
+  });
 }
 
 export async function deactivate(): Promise<void> {
