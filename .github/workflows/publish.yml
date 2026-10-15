@@ -2,6 +2,7 @@ name: Publish Extension to VS Code Marketplace
 
 on:
   push:
+    branches: [main]
     tags:
       - 'v*'
   workflow_dispatch:
@@ -9,6 +10,9 @@ on:
 permissions:
   contents: write
   id-token: write
+
+env:
+  ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: "node24"
 
 jobs:
   publish:
