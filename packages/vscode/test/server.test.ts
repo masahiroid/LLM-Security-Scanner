@@ -65,6 +65,7 @@ beforeAll(async () => {
     rootUri: URI.file(workspace).toString(),
     workspaceFolders: [{ uri: URI.file(workspace).toString(), name: 'ws' }],
     capabilities: { workspace: { configuration: true } },
+    locale: 'ja',
   });
   await conn.sendNotification('initialized', {});
 }, 60_000);
