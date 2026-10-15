@@ -1,0 +1,12 @@
+# LLMScan Configuration
+# https://github.com/masahiroid/LLM-Security-Scanner
+
+minConfidence: medium
+failOn: high
+baseline: .llmscan-baseline.json
+
+# テスト用フィクスチャおよびテストコードを通常のスキャン対象から除外
+exclude:
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/fixtures/**"
