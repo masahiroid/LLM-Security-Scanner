@@ -9,6 +9,8 @@
   "llmscan.views.findings": "Security Findings",
   "llmscan.config.enable": "Enable or disable LLMScan security analysis",
   "llmscan.config.minConfidence": "Minimum confidence level to display",
-  "llmscan.config.showBaselined": "Show existing findings registered in baseline file"
+  "llmscan.config.showBaselined": "Show existing findings registered in baseline file",
+  "llmscan.viewsWelcome.idle": "Detect security issues in your workspace.\n[Scan Workspace](command:llmscan.scanWorkspace)",
+  "llmscan.viewsWelcome.clean": "[Scan Workspace](command:llmscan.scanWorkspace)\n\n✓ No issues (No vulnerabilities detected)"
 }
 

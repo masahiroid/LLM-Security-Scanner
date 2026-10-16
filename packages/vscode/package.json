@@ -2,7 +2,7 @@
   "name": "llm-security-scan",
   "displayName": "LLMScan - AI Security Scanner",
   "description": "Bilingual (EN/JA) local static security scanner for Python, TypeScript, JavaScript, and PHP. Detects code/SQL injection and OWASP LLM05.",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "publisher": "masahirocom",
   "icon": "icon.png",
   "private": true,
@@ -61,6 +61,18 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "llmscan.findings",
+        "contents": "%llmscan.viewsWelcome.clean%",
+        "when": "llmscan.scanned"
+      },
+      {
+        "view": "llmscan.findings",
+        "contents": "%llmscan.viewsWelcome.idle%",
+        "when": "!llmscan.scanned"
+      }
+    ],
     "commands": [
       {
         "command": "llmscan.scanWorkspace",
