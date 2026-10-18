@@ -2,7 +2,7 @@
   "name": "llm-security-scan",
   "displayName": "LLMScan - AI Security Scanner",
   "description": "Bilingual (EN/JA) local static security scanner for Python, TypeScript, JavaScript, and PHP. Detects code/SQL injection and OWASP LLM05.",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "publisher": "masahirocom",
   "icon": "icon.png",
   "private": true,
@@ -115,6 +115,12 @@
         "title": "%llmscan.commands.clearBaseline%",
         "category": "LLMScan",
         "icon": "$(discard)"
+      },
+      {
+        "command": "llmscan.showDataflowGraph",
+        "title": "%llmscan.commands.showDataflowGraph%",
+        "category": "LLMScan",
+        "icon": "$(type-hierarchy-sub)"
       }
     ],
     "menus": {
@@ -153,6 +159,13 @@
           "command": "llmscan.clearBaseline",
           "when": "view == llmscan.findings",
           "group": "1_baseline@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "llmscan.showDataflowGraph",
+          "when": "view == llmscan.findings && viewItem == finding",
+          "group": "inline@1"
         }
       ]
     },
@@ -195,7 +208,7 @@
     "publish": "npm run build && vsce publish --no-dependencies"
   },
   "dependencies": {
-    "@llmscan/core": "1.5.0",
+    "@llmscan/core": "1.6.0",
     "vscode-languageclient": "9.0.1",
     "vscode-languageserver": "9.0.1",
     "vscode-languageserver-textdocument": "1.0.12",

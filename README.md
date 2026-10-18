@@ -25,8 +25,10 @@ All scans run **100% locally** using Tree-sitter WebAssembly parsers. **No code 
   Recognizes safe validation barriers including **Zod** schema parsing, **Yup**, **Pydantic** validation, cryptographic hash digests (`hashlib`, `crypto.createHash`, `bin2hex`), and type coercions (`+x`, `Number()`, `int()`, `filter_var`).
 - **Custom Rule Definitions (`.llmscan.yml`)**:
   Extend the engine with project-specific `sources`, `sinks`, and `sanitizers` per language without modifying scanner code.
-- **Interactive VS Code Extension & Auto-Fix**:
-  Includes a dedicated Activity Bar sidebar with severity badges, real-time squiggly diagnostics, detailed hovers, one-click safe code refactoring QuickFixes (`shell=False`, `ast.literal_eval`, `yaml.safe_load`, `textContent`), reason-enforced suppressions, and AI fix prompt export.
+- **Cross-File & Intra-File Taint Analysis (`ProjectIndex`)**:
+  Automatically indexes function summaries across files in your workspace to track untrusted inputs, LLM responses, sanitizers, and dangerous sink wrappers across module boundaries (`Source -> Cross-File Helper -> Sink`).
+- **Interactive VS Code Extension, Dataflow Graph & Auto-Fix**:
+  Includes a dedicated Activity Bar sidebar with severity badges, an interactive **Dataflow Taint Path Webview** (click any step node in the flowchart to jump to the exact line), real-time squiggly diagnostics, detailed hovers, one-click safe code refactoring QuickFixes (`shell=False`, `ast.literal_eval`, `yaml.safe_load`, `textContent`), reason-enforced suppressions, and AI fix prompt export.
 - **CI/CD, Differential Scan & SARIF Integration**:
   Provides a standalone CLI supporting Git-based differential scans (`--changed-only` / `--diff-base <ref>`) and SARIF reports for native GitHub Code Scanning integration.
 - **Baseline Support**:
@@ -63,7 +65,7 @@ Package and install the extension locally:
 
 ```bash
 npm run package:extension
-code --install-extension packages/vscode/llm-security-scan-1.5.0.vsix
+code --install-extension packages/vscode/llm-security-scan-1.6.0.vsix
 ```
 
 See [packages/vscode/README.md](packages/vscode/README.md) for full extension documentation.
