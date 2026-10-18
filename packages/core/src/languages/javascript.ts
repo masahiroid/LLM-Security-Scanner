@@ -1,6 +1,8 @@
 import {
   JS_CRYPTO_HASH_REGEX,
+  JS_PATH_SINK_REGEX,
   JS_SAFE_PRIMITIVES_REGEX,
+  JS_SSRF_SINK_REGEX,
   JS_VALIDATOR_SAFE_REGEX,
   JS_YUP_SAFE_SCHEMA_REGEX,
   JS_ZOD_SAFE_SCHEMA_REGEX,
@@ -136,6 +138,17 @@ export const javascript: LanguageSpec = {
     if (/^(html|append|prepend|after|before|replaceWith)$/.test(name) && /^(\$|jQuery)\b/.test(receiver)) {
       return { kind: 'xss', args: first };
     }
+
+    // --- SSRF ---
+    if (JS_SSRF_SINK_REGEX.test(path)) {
+      return { kind: 'ssrf', args: first };
+    }
+
+    // --- パストラバーサル ---
+    if (JS_PATH_SINK_REGEX.test(path)) {
+      return { kind: 'pathtrav', args: first };
+    }
+
     return null;
   },
 
@@ -153,6 +166,7 @@ export const javascript: LanguageSpec = {
       return ['sqli'];
     }
     if (/^(shellQuote\.quote|shellEscape|shellescape|quote)$/.test(path)) return ['cmdi'];
+    if (/^path\.basename$/.test(path)) return ['fileinc', 'pathtrav'];
     return null;
   },
 
