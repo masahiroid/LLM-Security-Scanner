@@ -2,11 +2,10 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions, TransportKind } from 'vscode-languageclient/node';
 
+import { LSP_DEBUG_PORT, SUPPORTED_VSCODE_LANGUAGES } from './server/constants';
 import { registerFindingsView } from './tree';
 
 let client: LanguageClient | undefined;
-
-const LANGUAGES = ['python', 'javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'php'];
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const { provider } = registerFindingsView(context);
@@ -14,10 +13,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const module = context.asAbsolutePath(path.join('dist', 'server.js'));
   const serverOptions: ServerOptions = {
     run: { module, transport: TransportKind.ipc },
-    debug: { module, transport: TransportKind.ipc, options: { execArgv: ['--nolazy', '--inspect=6019'] } },
+    debug: { module, transport: TransportKind.ipc, options: { execArgv: ['--nolazy', `--inspect=${LSP_DEBUG_PORT}`] } },
   };
   const clientOptions: LanguageClientOptions = {
-    documentSelector: LANGUAGES.flatMap((language) => [
+    documentSelector: SUPPORTED_VSCODE_LANGUAGES.flatMap((language) => [
       { scheme: 'file', language },
       { scheme: 'untitled', language },
     ]),

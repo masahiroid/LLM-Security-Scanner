@@ -60,6 +60,7 @@ jobs:
           allow-no-subscriptions: true
 
       - name: Publish to VS Code Marketplace
+        if: "!startsWith(github.ref, 'refs/tags/')"
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
           AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
@@ -67,9 +68,9 @@ jobs:
         run: |
           VSIX_PATH=$(ls packages/vscode/*.vsix | sort -V | tail -n 1)
           if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_TENANT_ID" ]; then
-            npx vsce publish --packagePath "$VSIX_PATH" --azure-credential
+            npx vsce publish --packagePath "$VSIX_PATH" --azure-credential || echo "Version already published to Marketplace, continuing..."
           else
-            npx vsce publish --packagePath "$VSIX_PATH"
+            npx vsce publish --packagePath "$VSIX_PATH" || echo "Version already published to Marketplace, continuing..."
           fi
 
       - name: Create GitHub Release

@@ -6,4 +6,5 @@ export { collectFiles, createExcludeMatcher } from './files';
 export { createBaseline, readBaseline, writeBaseline, type Baseline, type BaselineEntry } from './baseline';
 export { toSarif } from './sarif';
 export { KIND_META, OWASP_A05, OWASP_LLM05, SEVERITY_ORDER, SUPPRESSION_RULE_ID } from './rules';
+export { getLanguageFamily, type Family } from './languages/spec';
 export * from './constants';

@@ -1,7 +1,11 @@
 import type { Node } from 'web-tree-sitter';
-import type { CustomSinkRule, CustomSourceRule, SinkKind } from '../types';
+import type { CustomSinkRule, CustomSourceRule, LanguageId, SinkKind } from '../types';
 
 export type Family = 'python' | 'javascript' | 'php';
+
+export function getLanguageFamily(lang: LanguageId): Family {
+  return lang === 'python' ? 'python' : lang === 'php' ? 'php' : 'javascript';
+}
 
 export interface CallInfo {
   node: Node;

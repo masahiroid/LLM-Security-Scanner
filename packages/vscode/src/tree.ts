@@ -1,7 +1,11 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { SUPPRESSION_RULE_ID } from '@llmscan/core';
-import { collectReportItems, generateAiRemediationPrompt } from './report';
+import {
+  collectReportItems,
+  generateAiRemediationPrompt,
+  getDiagnosticRuleCode,
+  isActiveLlmscanDiagnostic,
+} from './report';
 
 export class FindingsTreeItem extends vscode.TreeItem {
   constructor(
@@ -44,31 +48,21 @@ export class FindingsTreeDataProvider implements vscode.TreeDataProvider<Finding
   }
 
   getChildren(element?: FindingsTreeItem): vscode.ProviderResult<FindingsTreeItem[]> {
+    const errSev = vscode.DiagnosticSeverity.Error;
+
     if (!element) {
       // ルート階層: llmscan による診断を持つファイル一覧
       const isJa = vscode.env.language.startsWith('ja');
       const fileDiagnostics = vscode.languages
         .getDiagnostics()
-        .filter(([, diags]) =>
-          diags.some(
-            (d) =>
-              d.source === 'llmscan' &&
-              d.code !== SUPPRESSION_RULE_ID &&
-              (!this.highOnlyFilter || d.severity === vscode.DiagnosticSeverity.Error),
-          ),
-        );
+        .filter(([, diags]) => diags.some((d) => isActiveLlmscanDiagnostic(d, this.highOnlyFilter, errSev)));
 
       if (fileDiagnostics.length === 0) {
         return [];
       }
 
       return fileDiagnostics.map(([uri, diags]) => {
-        const activeDiags = diags.filter(
-          (d) =>
-            d.source === 'llmscan' &&
-            d.code !== SUPPRESSION_RULE_ID &&
-            (!this.highOnlyFilter || d.severity === vscode.DiagnosticSeverity.Error),
-        );
+        const activeDiags = diags.filter((d) => isActiveLlmscanDiagnostic(d, this.highOnlyFilter, errSev));
         const count = activeDiags.length;
         const relative = vscode.workspace.asRelativePath(uri);
         const fileName = path.basename(uri.fsPath);
@@ -86,21 +80,13 @@ export class FindingsTreeDataProvider implements vscode.TreeDataProvider<Finding
     if (element.uri && !element.diagnostic) {
       // ファイル配下の指摘一覧
       const isJa = vscode.env.language.startsWith('ja');
-      const diags = (vscode.languages.getDiagnostics(element.uri) || []).filter(
-        (d) =>
-          d.source === 'llmscan' &&
-          d.code !== SUPPRESSION_RULE_ID &&
-          (!this.highOnlyFilter || d.severity === vscode.DiagnosticSeverity.Error),
+      const diags = (vscode.languages.getDiagnostics(element.uri) || []).filter((d) =>
+        isActiveLlmscanDiagnostic(d, this.highOnlyFilter, errSev),
       );
 
       return diags.map((d) => {
         const line = d.range.start.line + 1;
-        const code =
-          typeof d.code === 'string'
-            ? d.code
-            : typeof d.code === 'object' && d.code !== null
-              ? String(d.code.value)
-              : '';
+        const code = getDiagnosticRuleCode(d);
         const shortMsg = d.message.replace(/（確信度: .*?）/, '');
         const isLlm = code.startsWith('LLM05');
         const severityLabel =
@@ -160,8 +146,9 @@ export function registerFindingsView(context: vscode.ExtensionContext): {
 
   const updateBadge = () => {
     const isJa = vscode.env.language.startsWith('ja');
+    const errSev = vscode.DiagnosticSeverity.Error;
     const total = vscode.languages.getDiagnostics().reduce((acc, [, diags]) => {
-      return acc + diags.filter((d) => d.source === 'llmscan' && d.code !== SUPPRESSION_RULE_ID).length;
+      return acc + diags.filter((d) => isActiveLlmscanDiagnostic(d, false, errSev)).length;
     }, 0);
     treeView.badge =
       total > 0

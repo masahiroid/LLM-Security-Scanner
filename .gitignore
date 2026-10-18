@@ -8,3 +8,8 @@ SBOM-Reports/
 *.tsbuildinfo
 coverage/
 .cache/
+docs/
+AGENTS.md
+GEMINI.md
+.agents/
+.agent/

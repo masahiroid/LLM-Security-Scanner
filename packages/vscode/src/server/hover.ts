@@ -1,10 +1,16 @@
-import { CONFIDENCE_LABEL, CONFIDENCE_LABEL_EN, type Finding, KIND_META, type LanguageId, OWASP_A05, OWASP_LLM05 } from '@llmscan/core';
+import {
+  CONFIDENCE_LABEL,
+  CONFIDENCE_LABEL_EN,
+  type Finding,
+  KIND_META,
+  OWASP_A05,
+  OWASP_LLM05,
+  getLanguageFamily,
+} from '@llmscan/core';
 
 import { translateTraceStep } from './diagnostics';
 
-export function getLanguageFamily(lang: LanguageId): 'python' | 'javascript' | 'php' {
-  return lang === 'python' ? 'python' : lang === 'php' ? 'php' : 'javascript';
-}
+export { getLanguageFamily };
 
 export function createHoverMarkdown(f: Finding, isJa = true): string {
   if (f.kind === 'suppression') return `**LLMScan** \`${f.ruleId}\`\n\n${f.message}`;
@@ -77,7 +83,7 @@ export function createHoverMarkdown(f: Finding, isJa = true): string {
   for (const s of f.trace) {
     lines.push(`1. Line ${s.range.start.line + 1}: ${translateTraceStep(s.message).replace(/[*_`[\]]/g, '\\$&')}`);
   }
-  lines.push('', `[${owasp.id} ${owasp.title}](${owasp.url}) ｜ ${meta.cwe}`);
+  lines.push('', `[${owasp.id} ${owasp.titleEn}](${owasp.url}) ｜ ${meta.cwe}`);
   return lines.join('\n');
 }
 

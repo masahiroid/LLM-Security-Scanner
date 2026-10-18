@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import {
   type Confidence,
   type Finding,
+  MAX_FILE_SIZE_BYTES,
   type ScanConfig,
   type Severity,
   SEVERITY_ORDER,
@@ -20,6 +21,13 @@ import {
 } from '@llmscan/core';
 
 const VERSION = '1.4.0';
+const EXIT_CODE_CLEAN = 0;
+const EXIT_CODE_FINDINGS = 1;
+const EXIT_CODE_ERROR = 2;
+
+const SUPPORTED_FORMATS = ['text', 'json', 'sarif'] as const;
+const SUPPORTED_CONFIDENCES: Confidence[] = ['low', 'medium', 'high'];
+const SUPPORTED_FAIL_ON: (Severity | 'none')[] = ['low', 'medium', 'high', 'critical', 'none'];
 
 const HELP = `LLM Security Scanner ${VERSION}（コマンド名: llmscan）
 
@@ -41,7 +49,7 @@ const HELP = `LLM Security Scanner ${VERSION}（コマンド名: llmscan）
                                 ベースライン外にこの重大度以上の指摘があれば終了コード 1
   -h, --help
 
-終了コード: 0 = 問題なし / 1 = 失敗条件の指摘あり / 2 = 実行エラー
+終了コード: ${EXIT_CODE_CLEAN} = 問題なし / ${EXIT_CODE_FINDINGS} = 失敗条件の指摘あり / ${EXIT_CODE_ERROR} = 実行エラー
 `;
 
 interface Item {
@@ -124,9 +132,11 @@ async function scan(argv: string[]): Promise<number> {
   });
   if (values.help) {
     process.stdout.write(HELP);
-    return 0;
+    return EXIT_CODE_CLEAN;
   }
-  if (!['text', 'json', 'sarif'].includes(values.format!)) throw new Error(`--format が不正です: ${values.format}`);
+  if (!SUPPORTED_FORMATS.includes(values.format as (typeof SUPPORTED_FORMATS)[number])) {
+    throw new Error(`--format が不正です: ${values.format}`);
+  }
 
   const root = path.resolve(values.root ?? process.cwd());
   let config: ScanConfig;
@@ -139,11 +149,15 @@ async function scan(argv: string[]): Promise<number> {
     config = loadConfig(root).config;
   }
   if (values['min-confidence']) {
-    if (!['low', 'medium', 'high'].includes(values['min-confidence'])) throw new Error('--min-confidence が不正です');
+    if (!SUPPORTED_CONFIDENCES.includes(values['min-confidence'] as Confidence)) {
+      throw new Error('--min-confidence が不正です');
+    }
     config.minConfidence = values['min-confidence'] as Confidence;
   }
   if (values['fail-on']) {
-    if (!['low', 'medium', 'high', 'critical', 'none'].includes(values['fail-on'])) throw new Error('--fail-on が不正です');
+    if (!SUPPORTED_FAIL_ON.includes(values['fail-on'] as Severity | 'none')) {
+      throw new Error('--fail-on が不正です');
+    }
     config.failOn = values['fail-on'] as Severity | 'none';
   }
 
@@ -162,7 +176,7 @@ async function scan(argv: string[]): Promise<number> {
     } catch {
       continue;
     }
-    if (text.length > 2_000_000) continue; // 巨大な生成ファイルは対象外
+    if (text.length > MAX_FILE_SIZE_BYTES) continue; // 巨大な生成ファイルは対象外
     const findings = await scanSource(text, abs, { relativePath: rel, config });
     for (const finding of findings) {
       if (meetsConfidence(finding, config.minConfidence)) all.push({ finding, relativePath: rel });
@@ -173,7 +187,7 @@ async function scan(argv: string[]): Promise<number> {
   if (values['update-baseline']) {
     writeBaseline(baselinePath, createBaseline(all));
     process.stderr.write(`ベースラインを更新しました: ${path.relative(process.cwd(), baselinePath)}（${all.length} 件）\n`);
-    return 0;
+    return EXIT_CODE_CLEAN;
   }
 
   const known = values['no-baseline'] ? undefined : readBaseline(baselinePath);
@@ -191,24 +205,26 @@ async function scan(argv: string[]): Promise<number> {
   if (values.output) fs.writeFileSync(values.output, out);
   else process.stdout.write(out);
 
-  if (config.failOn === 'none') return 0;
+  if (config.failOn === 'none') return EXIT_CODE_CLEAN;
   const threshold = SEVERITY_ORDER[config.failOn];
-  return items.some((i) => i.finding.kind !== 'suppression' && SEVERITY_ORDER[i.finding.severity] >= threshold) ? 1 : 0;
+  return items.some((i) => i.finding.kind !== 'suppression' && SEVERITY_ORDER[i.finding.severity] >= threshold)
+    ? EXIT_CODE_FINDINGS
+    : EXIT_CODE_CLEAN;
 }
 
 async function main(): Promise<number> {
   const [command, ...rest] = process.argv.slice(2);
   if (!command || command === '-h' || command === '--help') {
     process.stdout.write(HELP);
-    return command ? 0 : 2;
+    return command ? EXIT_CODE_CLEAN : EXIT_CODE_ERROR;
   }
   if (command === '--version' || command === '-v') {
     process.stdout.write(VERSION + '\n');
-    return 0;
+    return EXIT_CODE_CLEAN;
   }
   if (command !== 'scan') {
     process.stderr.write(`不明なコマンドです: ${command}\n\n${HELP}`);
-    return 2;
+    return EXIT_CODE_ERROR;
   }
   return scan(rest);
 }
@@ -217,6 +233,6 @@ main().then(
   (code) => process.exit(code),
   (e: unknown) => {
     process.stderr.write(`llmscan: ${(e as Error).message}\n`);
-    process.exit(2);
+    process.exit(EXIT_CODE_ERROR);
   },
 );

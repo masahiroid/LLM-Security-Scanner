@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type * as vscode from 'vscode';
-import { KIND_META, SUPPRESSION_RULE_ID, type SinkKind } from '@llmscan/core';
+import { KIND_META, type LanguageId, SUPPRESSION_RULE_ID, type SinkKind, getLanguageFamily, languageForFile } from '@llmscan/core';
 
 export interface FindingReportItem {
   uri: vscode.Uri;
@@ -18,30 +18,45 @@ export interface FindingReportItem {
   cwe?: string;
 }
 
+/** Diagnostic からルール ID 文字列を取り出す */
+export function getDiagnosticRuleCode(d: vscode.Diagnostic, fallback = ''): string {
+  if (typeof d.code === 'string') return d.code;
+  if (typeof d.code === 'object' && d.code !== null) return String(d.code.value);
+  return fallback;
+}
+
+/** 表示対象となる llmscan の指摘かどうか判定する */
+export function isActiveLlmscanDiagnostic(
+  d: vscode.Diagnostic,
+  highOnly = false,
+  errorSeverity = 0,
+): boolean {
+  return (
+    d.source === 'llmscan' &&
+    d.code !== SUPPRESSION_RULE_ID &&
+    (!highOnly || d.severity === errorSeverity)
+  );
+}
+
 /**
  * ワークスペース内のすべての llmscan 指摘を収集し、レポート項目を作成する
  */
 export function collectReportItems(vscodeApi: typeof vscode, highOnly = false): FindingReportItem[] {
   const items: FindingReportItem[] = [];
   const isJa = vscodeApi.env.language.startsWith('ja');
+  const errSev = vscodeApi.DiagnosticSeverity.Error;
 
   const fileDiagnostics = vscodeApi.languages.getDiagnostics().filter(([, diags]) =>
-    diags.some((d) => d.source === 'llmscan' && d.code !== SUPPRESSION_RULE_ID),
+    diags.some((d) => isActiveLlmscanDiagnostic(d, false, errSev)),
   );
 
   for (const [uri, diags] of fileDiagnostics) {
-    const activeDiags = diags.filter(
-      (d) =>
-        d.source === 'llmscan' &&
-        d.code !== SUPPRESSION_RULE_ID &&
-        (!highOnly || d.severity === 0),
-    );
-
+    const activeDiags = diags.filter((d) => isActiveLlmscanDiagnostic(d, highOnly, errSev));
     if (activeDiags.length === 0) continue;
 
     const relativePath = vscodeApi.workspace.asRelativePath(uri);
-    const ext = path.extname(uri.fsPath).replace('.', '');
-    const lang = ext === 'ts' || ext === 'tsx' ? 'typescript' : ext === 'py' ? 'python' : ext === 'php' ? 'php' : 'javascript';
+    const langId: LanguageId = languageForFile(uri.fsPath) ?? 'javascript';
+    const lang = langId === 'tsx' ? 'typescript' : langId;
 
     let fileLines: string[] | undefined;
     try {
@@ -55,12 +70,7 @@ export function collectReportItems(vscodeApi: typeof vscode, highOnly = false): 
     for (const d of activeDiags) {
       const line = d.range.start.line + 1;
       const column = d.range.start.character + 1;
-      const ruleCode =
-        typeof d.code === 'string'
-          ? d.code
-          : typeof d.code === 'object' && d.code !== null
-            ? String(d.code.value)
-            : 'SECURITY-001';
+      const ruleCode = getDiagnosticRuleCode(d, 'SECURITY-001');
 
       const isCritical = ruleCode.startsWith('LLM05-') || ruleCode.includes('CMDI') || ruleCode.includes('CODEI');
       const severity: 'Critical' | 'High' | 'Medium' | 'Low' =
@@ -99,7 +109,7 @@ export function collectReportItems(vscodeApi: typeof vscode, highOnly = false): 
       if (metaKey) {
         const meta = KIND_META[metaKey];
         cwe = meta.cwe;
-        const family = lang === 'python' ? 'python' : lang === 'php' ? 'php' : 'javascript';
+        const family = getLanguageFamily(langId);
         recommendation = isJa ? meta.fix[family] : meta.fixEn[family];
       }
 

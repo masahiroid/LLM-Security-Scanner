@@ -167,9 +167,15 @@ export function ruleIdFor(kind: SinkKind, origin: OriginKind, prefix: string): s
   return origin === 'llm' ? `LLM05-${code}-001` : `${prefix}-${code}-001`;
 }
 
-export const OWASP_A05 = { id: 'A05:2025', title: 'インジェクション', url: 'https://owasp.org/Top10/' };
+export const OWASP_A05 = {
+  id: 'A05:2025',
+  title: 'インジェクション',
+  titleEn: 'Injection',
+  url: 'https://owasp.org/Top10/',
+};
 export const OWASP_LLM05 = {
   id: 'LLM05:2025',
-  title: '不適切な出力処理（Improper Output Handling）',
+  title: '不適切な出力処理',
+  titleEn: 'Improper Output Handling',
   url: 'https://genai.owasp.org/llmrisk/llm052025-improper-output-handling/',
 };
