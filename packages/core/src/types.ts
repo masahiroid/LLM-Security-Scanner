@@ -1,7 +1,18 @@
 export type LanguageId = 'python' | 'javascript' | 'typescript' | 'tsx' | 'php';
 
-/** 危険な処理（sink）の種類 */
-export type SinkKind = 'sqli' | 'cmdi' | 'codei' | 'deser' | 'xss' | 'ssti' | 'fileinc';
+/** 危険な処理（sink）および検出ルールの種類 */
+export type SinkKind =
+  | 'sqli'
+  | 'cmdi'
+  | 'codei'
+  | 'deser'
+  | 'xss'
+  | 'ssti'
+  | 'fileinc'
+  | 'ssrf'
+  | 'pathtrav'
+  | 'prompti'
+  | 'secret';
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low';
 export type Confidence = 'high' | 'medium' | 'low';

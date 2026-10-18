@@ -1,4 +1,9 @@
-import { PHP_SAFE_FILTER_REGEX, PHP_SAFE_PRIMITIVES_REGEX } from '../constants';
+import {
+  PHP_PATH_SINK_REGEX,
+  PHP_SAFE_FILTER_REGEX,
+  PHP_SAFE_PRIMITIVES_REGEX,
+  PHP_SSRF_SINK_REGEX,
+} from '../constants';
 import { type CallInfo, type LanguageSpec, matchesCustom } from './spec';
 
 const SUPERGLOBALS = /^(_GET|_POST|_REQUEST|_COOKIE|_FILES|_SERVER|HTTP_RAW_POST_DATA)\b/;
@@ -56,6 +61,13 @@ export const php: LanguageSpec = {
       if (/^(eval|assert)$/.test(name)) return { kind: 'codei', args: first };
       if (name === 'create_function') return { kind: 'codei', args };
       if (name === 'unserialize') return { kind: 'deser', args: first };
+      if (PHP_SSRF_SINK_REGEX.test(name)) return { kind: 'ssrf', args: first };
+      if (name === 'curl_setopt' && args[1]?.text === 'CURLOPT_URL' && args[2]) {
+        return { kind: 'ssrf', args: [args[2]] };
+      }
+      if (PHP_PATH_SINK_REGEX.test(name) && !(name === 'file_get_contents' && args[0]?.text.includes('php://input'))) {
+        return { kind: 'pathtrav', args: first };
+      }
       return null;
     }
     if (SQL_METHOD.test(name)) {
@@ -75,7 +87,7 @@ export const php: LanguageSpec = {
     if (/^(escapeshellarg|escapeshellcmd)$/.test(path)) return ['cmdi'];
     if (/^(mysqli_real_escape_string|pg_escape_string|pg_escape_literal|sqlite_escape_string)$/.test(path)) return ['sqli'];
     if (name === 'real_escape_string' || name === 'quote' || name === 'escape_string') return ['sqli'];
-    if (path === 'basename') return ['fileinc'];
+    if (path === 'basename') return ['fileinc', 'pathtrav'];
     return null;
   },
 

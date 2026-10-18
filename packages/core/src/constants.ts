@@ -124,3 +124,36 @@ export const PHP_SAFE_PRIMITIVES_REGEX =
 export const PHP_SAFE_FILTER_REGEX =
   /VALIDATE_(INT|FLOAT|BOOL|BOOLEAN|IP|MAC|DOMAIN)/;
 
+// --- SSRF & パストラバーサル検出パターン (v1.5.0) ---
+export const PY_SSRF_SINK_REGEX =
+  /^(requests|httpx|aiohttp\.ClientSession)\.(get|post|put|delete|patch|head|options|request)$|^urllib\.request\.urlopen$/;
+
+export const PY_PATH_SINK_REGEX =
+  /^(builtins\.)?open$|^os\.(remove|unlink|rmdir|makedirs|listdir)$|^shutil\.(rmtree|copy|copy2|copyfile|move)$|^(flask\.)?send_file$/;
+
+export const JS_SSRF_SINK_REGEX =
+  /^(window\.|globalThis\.)?fetch$|^(axios|got|ky)\.(get|post|put|delete|patch|head|request)$|^axios$/;
+
+export const JS_PATH_SINK_REGEX =
+  /^(fs|fs\.promises| fsPromises)\.(readFile|readFileSync|writeFile|writeFileSync|appendFile|appendFileSync|unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync|createReadStream|createWriteStream)$|^(res|response)\.(sendFile|download)$/;
+
+export const PHP_SSRF_SINK_REGEX = /^(curl_init|get_headers)$/;
+export const PHP_PATH_SINK_REGEX =
+  /^(file_get_contents|file_put_contents|fopen|readfile|unlink|rmdir|copy|rename)$/;
+
+// --- OWASP LLM01: システムプロンプト汚染検出パターン ---
+export const SYSTEM_ROLE_VALUE_REGEX = /^['"`]?(system|developer)['"`]?$/i;
+export const SYSTEM_PROMPT_KEY_REGEX = /^['"`]?(system|system_instruction|systemInstruction|instructions)['"`]?$/;
+export const SYSTEM_MESSAGE_CALL_REGEX = /(^|\.)(SystemMessage|ChatPromptTemplate\.from_messages)$/;
+export const MESSAGES_KEY_REGEX = /^['"`]?messages['"`]?$/;
+export const ROLE_KEY_REGEX = /^['"`]?role['"`]?$/;
+export const CONTENT_KEY_REGEX = /^['"`]?(content|text)['"`]?$/;
+
+// --- OWASP LLM02: ハードコードされた API キー・シークレット検出パターン ---
+export const HARDCODED_API_KEY_REGEX =
+  /\b(sk-(?:proj-|ant-api03-|live-)?[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|hf_[A-Za-z0-9]{30,}|ghp_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]{20,})\b/;
+
+/** シークレット検出時にマスク表示する先頭文字数 */
+export const MASKED_SECRET_PREFIX_LENGTH = 8;
+
+

@@ -65,7 +65,7 @@ npm run build        # 全パッケージのビルド
 
 ```bash
 npm run package:extension
-code --install-extension packages/vscode/llm-security-scan-1.4.0.vsix
+code --install-extension packages/vscode/llm-security-scan-1.5.0.vsix
 ```
 
 詳細な機能や画面操作については [packages/vscode/README.ja.md](packages/vscode/README.ja.md) をご覧ください。
@@ -109,6 +109,10 @@ node packages/cli/dist/cli.js scan [パス...] [--format text|json|sarif] [--out
 | `{PY,JS}-SSTI-001` | テンプレートインジェクション | High | 外部値からの動的テンプレート生成 |
 | `{PY,JS,PHP}-XSS-001` | クロスサイトスクリプティング | Medium | エスケープなしでの HTML 出力（`innerHTML`, `dangerouslySetInnerHTML`） |
 | `PHP-FILEINC-001` | ファイルインクルード | High | 動的パスによる `include` / `require` |
+| `{PY,JS,PHP}-SSRF-001` | SSRF（サーバーサイドリクエストフォージェリ） | High | 外部入力や LLM 出力による送信先 URL の制御 |
+| `{PY,JS,PHP}-PATH-001` | パストラバーサル | High | 外部入力によるファイル読み書き・削除パスの制御 |
+| `LLM01-PROMPTI-001` | **OWASP LLM01** | High | 信頼できない外部入力のシステムプロンプト（`system` / `developer`）への直接結合 |
+| `LLM02-SECRET-001` | **OWASP LLM02** | High | ソースコード内にハードコードされた API キー・機密トークン |
 | `LLM05-*-001` | **OWASP LLM05** | Critical / High | LLM の応答が危険な処理へ到達（不適切な出力処理） |
 | `LLMSCAN-SUPPRESS-001` | 理由のない抑制 | Low | 理由の明記がない抑制コメント |
 

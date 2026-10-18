@@ -63,7 +63,7 @@ Package and install the extension locally:
 
 ```bash
 npm run package:extension
-code --install-extension packages/vscode/llm-security-scan-1.4.0.vsix
+code --install-extension packages/vscode/llm-security-scan-1.5.0.vsix
 ```
 
 See [packages/vscode/README.md](packages/vscode/README.md) for full extension documentation.
@@ -107,6 +107,10 @@ node packages/cli/dist/cli.js scan [paths...] [--format text|json|sarif] [--outp
 | `{PY,JS}-SSTI-001` | Template Injection | High | Dynamic template construction from external input |
 | `{PY,JS,PHP}-XSS-001` | Cross-Site Scripting | Medium | Unescaped HTML rendering (`innerHTML`, `dangerouslySetInnerHTML`) |
 | `PHP-FILEINC-001` | File Inclusion | High | Dynamic path used in `include` / `require` |
+| `{PY,JS,PHP}-SSRF-001` | SSRF | High | Outbound HTTP request URL controlled by untrusted input |
+| `{PY,JS,PHP}-PATH-001` | Path Traversal | High | File system read/write/delete path controlled by untrusted input |
+| `LLM01-PROMPTI-001` | **OWASP LLM01** | High | Untrusted input concatenated into `system` / `developer` prompt |
+| `LLM02-SECRET-001` | **OWASP LLM02** | High | Hardcoded LLM / Cloud API key or token in source code |
 | `LLM05-*-001` | **OWASP LLM05** | Critical / High | LLM output flowing directly to dangerous sink |
 | `LLMSCAN-SUPPRESS-001` | Invalid Suppression | Low | Suppression comment without reason |
 

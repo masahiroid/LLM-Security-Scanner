@@ -97,6 +97,10 @@ sinks:                       # 自作の危険な処理・シンク関数
 | `{PY,JS}-SSTI-001` | テンプレートインジェクション | High |
 | `{PY,JS,PHP}-XSS-001` | クロスサイトスクリプティング (`innerHTML`, `echo`) | Medium |
 | `PHP-FILEINC-001` | ファイルインクルード (`include`, `require`) | High |
+| `{PY,JS,PHP}-SSRF-001` | SSRF・サーバーサイドリクエストフォージェリ (`fetch`, `requests.get`) | High |
+| `{PY,JS,PHP}-PATH-001` | パストラバーサル (`fs.readFile`, `open`) | High |
+| `LLM01-PROMPTI-001` | **OWASP LLM01** システムプロンプトインジェクション | High |
+| `LLM02-SECRET-001` | **OWASP LLM02** ハードコードされた API キー・機密情報 | High |
 | `LLM05-*-001` | **OWASP LLM05** 不適切な出力処理 | Critical / High |
 | `LLMSCAN-SUPPRESS-001` | 理由のない抑制コメント | Low |
 

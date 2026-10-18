@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parse as parseYaml } from 'yaml';
+import { KIND_META } from './rules';
 import type { Confidence, CustomSinkRule, CustomSourceRule, ScanConfig, Severity, SinkKind } from './types';
 
 export const CONFIG_FILES = ['.llmscan.yml', '.llmscan.yaml'];
@@ -29,7 +30,7 @@ export const DEFAULT_CONFIG: ScanConfig = {
 
 const CONFIDENCES: Confidence[] = ['low', 'medium', 'high'];
 const SEVERITIES: (Severity | 'none')[] = ['low', 'medium', 'high', 'critical', 'none'];
-const SINK_KINDS: SinkKind[] = ['sqli', 'cmdi', 'codei', 'deser', 'xss', 'ssti', 'fileinc'];
+const SINK_KINDS = Object.keys(KIND_META) as SinkKind[];
 
 function stringList(value: unknown, key: string): string[] {
   if (value === undefined || value === null) return [];
