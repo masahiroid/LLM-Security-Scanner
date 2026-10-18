@@ -150,8 +150,8 @@ describe('Language Server', () => {
     expect(await diags).toEqual([]);
   });
 
-  it('LLM の応答を危険な処理に渡すコードを LLM05 として報告する（TypeScript）', async () => {
-    const { diags } = open(
+  it('LLM の応答を危険な処理に渡すコードを LLM05 として報告し、1クリック安全修正 QuickFix を提供する（TypeScript）', async () => {
+    const { uri, diags } = open(
       'web/ai.ts',
       `import OpenAI from 'openai';
 const openai = new OpenAI();
@@ -164,6 +164,12 @@ export async function render(q: string) {
     );
     const [d] = await diags;
     expect(d.code).toBe('LLM05-XSS-001');
+    const actions = (await conn.sendRequest('textDocument/codeAction', {
+      textDocument: { uri },
+      range: d.range,
+      context: { diagnostics: [d] },
+    })) as { title: string; edit: { changes: Record<string, { newText: string }[]> } }[];
+    expect(actions.some((a) => a.title.includes('.textContent') && a.edit.changes[uri][0].newText === '.textContent')).toBe(true);
   });
 
   it('ベースラインを作成すると既存の指摘は表示されなくなる', async () => {

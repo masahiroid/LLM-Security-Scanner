@@ -1,6 +1,7 @@
 {
   "name": "llm-security-scanner",
   "private": true,
+  "license": "Apache-2.0",
   "workspaces": [
     "packages/core",
     "packages/cli",

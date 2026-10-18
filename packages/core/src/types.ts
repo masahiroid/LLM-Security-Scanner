@@ -57,10 +57,38 @@ export interface SanitizerConfig {
   php?: string[];
 }
 
+export interface CustomSourceRule {
+  pattern: string;
+  kind?: 'user' | 'llm';
+  label?: string;
+}
+
+export interface CustomSinkRule {
+  pattern: string;
+  category: SinkKind;
+  ruleId?: string;
+  severity?: Severity;
+  argIndex?: number;
+}
+
+export interface CustomSourceConfig {
+  python?: CustomSourceRule[];
+  javascript?: CustomSourceRule[];
+  php?: CustomSourceRule[];
+}
+
+export interface CustomSinkConfig {
+  python?: CustomSinkRule[];
+  javascript?: CustomSinkRule[];
+  php?: CustomSinkRule[];
+}
+
 export interface ScanConfig {
   minConfidence: Confidence;
   failOn: Severity | 'none';
   baseline: string;
   exclude: string[];
   sanitizers: SanitizerConfig;
+  sources?: CustomSourceConfig;
+  sinks?: CustomSinkConfig;
 }

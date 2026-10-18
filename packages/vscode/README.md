@@ -1,5 +1,10 @@
 # LLMScan - AI Security Scanner
 
+[![Visual Studio Marketplace](https://vsmarketplacebadges.dev/version/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![Downloads](https://vsmarketplacebadges.dev/downloads/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![Rating](https://vsmarketplacebadges.dev/rating-star/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 English | [日本語 (Japanese)](README.ja.md)
 
 **Local Static Application Security Testing (SAST) for AI & Web Applications**
@@ -20,10 +25,10 @@ All scans run **100% locally** inside your editor using Tree-sitter WebAssembly.
   Dedicated Activity Bar icon (`llm.svg`) and sidebar view with severity badges, line-by-line navigation, and a quick toggle filter for High/Critical issues.
 - **Intelligent Taint Tracking & Sanitizers**:
   Built-in understanding of safe sanitizers: Zod schema validation, Yup, Pydantic, cryptographic hash digests (`hashlib`, `crypto.createHash`, `bin2hex`), and type coercion (`+x`, `Number()`, `int()`, `filter_var`).
-- **Actionable Hovers & QuickFix**:
-  Hover over any wavy line to see the vulnerability explanation, language-specific remediation examples, complete taint propagation trace, and OWASP/CWE references. Insert reason-enforced suppression comments with one click (`QuickFix`).
-- **Baseline Support**:
-  Create `.llmscan-baseline.json` to suppress legacy technical debt and only alert on newly introduced vulnerabilities.
+- **Actionable Hovers & 1-Click Safe Refactoring QuickFixes**:
+  Hover over any wavy line to see the vulnerability explanation, language-specific remediation examples, complete taint propagation trace, and OWASP/CWE references. Automatically refactor common vulnerabilities (`shell=True` -> `shell=False`, `eval()` -> `ast.literal_eval()` / `JSON.parse()`, `yaml.load()` -> `yaml.safe_load()`, `.innerHTML` -> `.textContent`) or insert reason-enforced suppression comments with one click (`QuickFix`).
+- **Custom Rules & Baseline Support**:
+  Define custom `sources`, `sinks`, and `sanitizers` in `.llmscan.yml`, and create `.llmscan-baseline.json` to suppress legacy technical debt and only alert on newly introduced vulnerabilities.
 
 ---
 
@@ -34,11 +39,11 @@ All scans run **100% locally** inside your editor using Tree-sitter WebAssembly.
 | **Real-time Diagnostics** | Automatically scans active files and highlights vulnerabilities in the Problems panel and editor squiggly lines. |
 | **Dataflow Trace** | Under "Related Information", view the complete path: `Source -> Assignment -> Sink`. |
 | **Detailed Explanation** | Hover over findings to view why it is dangerous, safe remediation code, and CWE links. |
+| **One-Click Safe Auto-Fix** | Click the QuickFix lightbulb to safely refactor dangerous calls or insert `# llmscan-ignore[RULE]: TODO Reason`. |
 | **Copy for AI Fix** | Click the `$(copy)` button in the sidebar title to copy all findings formatted as an AI remediation prompt (Markdown) directly to clipboard. |
 | **Open Report in Tab** | Click the `$(output)` button in the sidebar title to open the findings report in a new Markdown editor tab. |
 | **Clear Scan Results** | Click the `$(clear-all)` button to clear whole-workspace scan results and reset the view back to only open files. |
-| **Suppression** | Click the QuickFix lightbulb to insert `# llmscan-ignore[RULE]: TODO Reason`. |
-| **Workspace Scan** | Click the `$(refresh)` button or run `LLMScan: Scan entire workspace` from the Command Palette. |
+| **Workspace Scan** | Click the `Scan Workspace` button or `$(refresh)` icon, or run `LLMScan: Scan entire workspace` from the Command Palette. |
 | **Baseline / Reset** | Run `Create baseline` to ignore existing alerts, or `Clear baseline` to restore and view all findings again. |
 
 ---
@@ -59,6 +64,17 @@ sanitizers:                  # Custom sanitization functions defined in your pro
   javascript: ["mySanitizer"]
   python: ["app.security.sanitize_query"]
   php: ["clean_input"]
+sources:                     # Custom untrusted input or LLM response sources
+  python:
+    - pattern: "my_llm.ask"
+      kind: llm              # user | llm
+      label: "Custom LLM response"
+sinks:                       # Custom dangerous sink functions
+  python:
+    - pattern: "legacy_db.run_raw"
+      ruleId: "PY-SQLI-001"
+      category: sqli
+      severity: high
 ```
 
 ### VS Code Settings (`settings.json`)
@@ -87,3 +103,9 @@ sanitizers:                  # Custom sanitization functions defined in your pro
 ## 🔒 Privacy & Local Processing
 
 LLMScan is built on local Tree-sitter WebAssembly grammar parsers. **No source code, file paths, or telemetry are ever transmitted across the network.** It functions completely offline and in air-gapped environments.
+
+---
+
+## 📄 License
+
+[Apache License 2.0](LICENSE)

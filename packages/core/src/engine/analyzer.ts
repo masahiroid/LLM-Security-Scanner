@@ -1,5 +1,5 @@
 import type { Node } from 'web-tree-sitter';
-import type { CallInfo, FileContext, LanguageSpec } from '../languages/spec';
+import { type CallInfo, type FileContext, type LanguageSpec, matchesCustom } from '../languages/spec';
 import { KIND_META } from '../rules';
 import { CLEAN_UNARY_OPERATORS } from '../constants';
 import type { Finding, LanguageId, OriginKind } from '../types';
@@ -17,7 +17,7 @@ import {
   step,
 } from './ast-utils';
 import { Scope } from './scope';
-import { SinkReporter } from './sink-reporter';
+import { type SinkOverrides, SinkReporter } from './sink-reporter';
 import { type SharedState, type Summary } from './summary';
 import { type T, addStep, createSourceTaint, union } from './taint';
 
@@ -265,7 +265,7 @@ export class Analyzer {
 
   private evMember(node: Node): T {
     const path = calleePath(node);
-    const src = this.spec.sourceForPath(path);
+    const src = this.spec.sourceForPath(path) ?? this.matchCustomSource(path);
     const object =
       node.childForFieldName('object') ?? node.childForFieldName('value') ?? named(node)[0] ?? null;
     const objectTaint = this.ev(object);
@@ -273,6 +273,15 @@ export class Analyzer {
     if (src) return this.sourceTaint(node, src.kind, src.label);
     if (this.scope.has(path)) return this.scope.get(path);
     return objectTaint;
+  }
+
+  private matchCustomSource(path: string): { kind: 'user' | 'llm'; label: string } | null {
+    for (const rule of this.input.ctx.customSources ?? []) {
+      if (matchesCustom(path, [rule.pattern])) {
+        return { kind: rule.kind ?? 'user', label: rule.label ?? rule.pattern };
+      }
+    }
+    return null;
   }
 
   private evDecorated(node: Node): T {
@@ -432,8 +441,24 @@ export class Analyzer {
     if (sink) {
       for (const arg of sink.args) this.checkSink(sink.kind, arg, node, call.path);
     }
+    for (const rule of this.input.ctx.customSinks ?? []) {
+      if (matchesCustom(call.path, [rule.pattern])) {
+        const targetArgs =
+          rule.argIndex !== undefined
+            ? call.args[rule.argIndex]
+              ? [call.args[rule.argIndex]]
+              : []
+            : [...call.args, ...call.kwargs.values()];
+        for (const arg of targetArgs) {
+          this.checkSink(rule.category, arg, node, call.path, undefined, {
+            ruleId: rule.ruleId,
+            severity: rule.severity,
+          });
+        }
+      }
+    }
 
-    const src = this.spec.sourceForCall(call, this.input.ctx);
+    const src = this.spec.sourceForCall(call, this.input.ctx) ?? this.matchCustomSource(call.path);
     if (src) return this.sourceTaint(node, src.kind, src.label);
     if (sink && (sink.kind === 'sqli' || sink.kind === 'cmdi' || sink.kind === 'fileinc')) {
       return null;
@@ -717,9 +742,10 @@ export class Analyzer {
     anchor: Node,
     label: string,
     precomputed?: T,
+    overrides?: SinkOverrides,
   ): void {
     const t = precomputed !== undefined ? precomputed : this.ev(arg);
-    this.reporter.checkSink(kind, arg, anchor, label, t, this.scope.functionName);
+    this.reporter.checkSink(kind, arg, anchor, label, t, this.scope.functionName, overrides);
   }
 }
 

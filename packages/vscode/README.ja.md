@@ -1,5 +1,10 @@
 # LLMScan - AI Security Scanner
 
+[![Visual Studio Marketplace](https://vsmarketplacebadges.dev/version/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![Downloads](https://vsmarketplacebadges.dev/downloads/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![Rating](https://vsmarketplacebadges.dev/rating-star/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 [English](README.md) | 日本語
 
 **AI & Web アプリケーション向け ローカル静的セキュリティ検査ツール**
@@ -22,10 +27,10 @@ LLMScan は、**Python**、**TypeScript**、**JavaScript**、**PHP** のコー�
   専用のアクティビティバーアイコン（`llm.svg`）、指摘件数バッジ、重要度別のアイコン表示、行単位のジャンプ、高重大度（High / Critical）のみを絞り込むフィルターボタンを搭載。
 - **高精度な無害化判定**:
   Zod、Yup、Pydantic によるスキーマ検証、暗号学的ハッシュ（`hashlib`, `crypto.createHash`, `bin2hex`）、単項数値変換（`+x`, `Number()`, `int()`, `filter_var`）などを安全と自動判定。
-- **充実したホバー解説 & クイックフィックス**:
-  波線にカーソルを合わせると、危険な理由・安全な書き方・OWASP / CWE リンクを表示。電球メニューから 1 クリックで理由付きの抑制コメントを挿入可能。
-- **ベースライン対応**:
-  `.llmscan-baseline.json` を作成することで既存の指摘を除外し、今後新しく混入した指摘だけを通知。
+- **充実したホバー解説 & 1クリック自動修正クイックフィックス**:
+  波線にカーソルを合わせると、危険な理由・安全な書き方・OWASP / CWE リンクを表示。電球メニューから 1 クリックで安全なコードへの自動書き換え（`shell=False`、`ast.literal_eval`、`yaml.safe_load`、`textContent` 等）や理由付きの抑制コメント挿入が可能。
+- **カスタムルール & ベースライン対応**:
+  `.llmscan.yml` で独自の `sources`・`sinks`・`sanitizers` を定義可能。また `.llmscan-baseline.json` を作成することで既存の指摘を除外し、今後新しく混入した指摘だけを通知。
 
 ---
 
@@ -36,11 +41,11 @@ LLMScan は、**Python**、**TypeScript**、**JavaScript**、**PHP** のコー�
 | **リアルタイム診断** | 対象言語のファイルを開くと自動で解析。問題パネルやエディタ内に波線表示されます。 |
 | **経路の確認** | 指摘の「関連情報」に「入力の出どころ → 代入 → 危険な処理」の全ステップが表示されます。 |
 | **詳細解説** | 波線にカーソルを合わせると、危険な理由・安全な書き方・CWE リンクを表示します。 |
+| **1クリック自動修正** | 電球メニューから安全な関数・オプションへの自動置換や、抑制コメントの挿入を行えます。 |
 | **AI修正用に一括コピー** | サイドバーの `$(copy)` ボタンをクリックすると、AI（Claude / ChatGPT / Copilot）向けの修正指示プロンプト付き Markdown がクリップボードにコピーされます。 |
 | **レポートをタブで開く** | サイドバーの `$(output)` ボタンをクリックすると、指摘一覧レポートを新しい Markdown タブで閲覧・編集・保存できます。 |
 | **スキャン結果のクリア** | サイドバーの `$(clear-all)` ボタンで、ワークスペース全体スキャンの結果をクリアし、現在開いているファイルのみの表示に戻せます。 |
-| **抑制コメント** | 電球メニュー「この箇所で抑制する」をクリックし、挿入されたコメントに理由を記入します。 |
-| **全体スキャン** | サイドバーの `$(refresh)` ボタンまたは「LLMScan: ワークスペース全体をスキャン」を実行。 |
+| **全体スキャン** | サイドバーの「ワークスペース全体をスキャン」ボタンまたは `$(refresh)` ボタンを実行。 |
 | **既存指摘の除外 / 解除** | 「ベースラインを作成」で既存の指摘を非表示に、「ベースラインを解除」で全指摘を再表示に戻せます。 |
 
 ---
@@ -61,6 +66,17 @@ sanitizers:                  # 自作のエスケープ・検証関数（別フ�
   javascript: ["mySanitizer"]
   python: ["app.security.sanitize_query"]
   php: ["clean_input"]
+sources:                     # 自作の外部入力・社内 LLM ラッパー等の汚染源
+  python:
+    - pattern: "my_llm.ask"
+      kind: llm              # user | llm
+      label: "社内 LLM 応答"
+sinks:                       # 自作の危険な処理・シンク関数
+  python:
+    - pattern: "legacy_db.run_raw"
+      ruleId: "PY-SQLI-001"
+      category: sqli
+      severity: high
 ```
 
 ### VS Code 設定項目
@@ -89,4 +105,10 @@ sanitizers:                  # 自作のエスケープ・検証関数（別フ�
 ## 🔒 プライバシー保護
 
 LLMScan は手元で Tree-sitter WebAssembly によりローカル完結でコードを解析します。**ソースコードやファイル名などの外部送信は一切行いません。**
+
+---
+
+## 📄 ライセンス
+
+[Apache License 2.0](LICENSE)
 

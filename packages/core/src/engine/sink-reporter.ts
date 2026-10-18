@@ -1,6 +1,6 @@
 import type { Node } from 'web-tree-sitter';
 import { KIND_META, ruleIdFor, severityFor } from '../rules';
-import type { Finding, LanguageId, SinkKind } from '../types';
+import type { Finding, LanguageId, Severity, SinkKind } from '../types';
 import { rangeOf, step } from './ast-utils';
 import { confidenceOf } from './confidence';
 import type { Taint } from './taint';
@@ -9,6 +9,11 @@ export interface SinkReportTarget {
   file: string;
   language: LanguageId;
   rulePrefix: string;
+}
+
+export interface SinkOverrides {
+  ruleId?: string;
+  severity?: Severity;
 }
 
 /**
@@ -31,10 +36,11 @@ export class SinkReporter {
     label: string,
     t: Taint | null,
     currentFunctionName: string,
+    overrides?: SinkOverrides,
   ): void {
     if (!t || t.sanitized.has(kind)) return;
 
-    const ruleId = ruleIdFor(kind, t.origin, this.target.rulePrefix);
+    const ruleId = overrides?.ruleId ?? ruleIdFor(kind, t.origin, this.target.rulePrefix);
     const dedupeKey = `${ruleId}:${arg.startIndex}:${arg.endIndex}`;
     if (this.reported.has(dedupeKey)) return;
     this.reported.add(dedupeKey);
@@ -57,7 +63,7 @@ export class SinkReporter {
     this.findings.push({
       ruleId,
       kind,
-      severity: severityFor(kind, t.origin),
+      severity: overrides?.severity ?? severityFor(kind, t.origin),
       confidence,
       origin: t.origin,
       message: `${prefix} ${subject}${how}が ${label} に渡されています${tail}`,

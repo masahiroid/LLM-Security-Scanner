@@ -253,5 +253,32 @@ describe('Phase 1: ORM・バリデータ拡充', () => {
     const findings = await scanSource(code, 'mcp-server.ts');
     expect(findings.some((f) => f.ruleId === 'LLM05-CODEI-001')).toBe(true);
   });
+
+  it('v1.4: .llmscan.yml のカスタム sources と sinks を検出する', async () => {
+    const config = parseConfig(`
+sources:
+  python:
+    - pattern: "my_llm.ask"
+      kind: llm
+      label: "社内LLM応答"
+sinks:
+  python:
+    - pattern: "legacy_db.run_raw"
+      category: sqli
+      ruleId: "CUSTOM-SQLI-001"
+      severity: critical
+`);
+    const code = `
+def handle(prompt):
+    ans = my_llm.ask(prompt)
+    legacy_db.run_raw("SELECT * FROM items WHERE name = '" + ans + "'")
+`;
+    const findings = await scanSource(code, 'custom.py', { config });
+    expect(findings).toHaveLength(1);
+    expect(findings[0].ruleId).toBe('CUSTOM-SQLI-001');
+    expect(findings[0].severity).toBe('critical');
+    expect(findings[0].origin).toBe('llm');
+    expect(findings[0].trace[0].message).toContain('社内LLM応答');
+  });
 });
 

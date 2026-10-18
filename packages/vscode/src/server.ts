@@ -366,7 +366,7 @@ connection.onCodeAction((params): CodeAction[] => {
   if (!doc) return [];
   const lang = LANGUAGE_IDS[doc.languageId];
   if (!lang) return [];
-  return buildCodeActions(doc, params.context.diagnostics, lang);
+  return buildCodeActions(doc, params.context.diagnostics, lang, isJa());
 });
 
 connection.onExecuteCommand(async (params) => {

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -18,7 +19,7 @@ import {
   writeBaseline,
 } from '@llmscan/core';
 
-const VERSION = '0.1.0';
+const VERSION = '1.4.0';
 
 const HELP = `LLM Security Scanner ${VERSION}（コマンド名: llmscan）
 
@@ -30,6 +31,8 @@ const HELP = `LLM Security Scanner ${VERSION}（コマンド名: llmscan）
   --output <ファイル>           結果をファイルに書き出す（既定: 標準出力）
   --root <ディレクトリ>         プロジェクトのルート（既定: カレントディレクトリ）
   --config <ファイル>           設定ファイル（既定: <root>/.llmscan.yml）
+  --changed-only                Git で変更されたファイルのみをスキャン（HEAD との差分＋未追跡ファイル）
+  --diff-base <Git参照>         指定した Git 参照（例: origin/main）から変更されたファイルのみをスキャン
   --baseline <ファイル>         ベースライン（既定: 設定の baseline）
   --no-baseline                 ベースラインを使わない
   --update-baseline             現在の指摘でベースラインを作成・更新する
@@ -44,6 +47,36 @@ const HELP = `LLM Security Scanner ${VERSION}（コマンド名: llmscan）
 interface Item {
   finding: Finding;
   relativePath: string;
+}
+
+function getGitChangedFiles(root: string, diffBase?: string): Set<string> {
+  const ref = diffBase ?? 'HEAD';
+  const out = new Set<string>();
+  try {
+    const diffOut = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', ref], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    for (const line of diffOut.split(/\r?\n/)) {
+      const trimmed = line.trim().replace(/\\/g, '/');
+      if (trimmed) out.add(trimmed);
+    }
+    if (!diffBase) {
+      const untrackedOut = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      for (const line of untrackedOut.split(/\r?\n/)) {
+        const trimmed = line.trim().replace(/\\/g, '/');
+        if (trimmed) out.add(trimmed);
+      }
+    }
+  } catch (e) {
+    throw new Error(`Git 差分の取得に失敗しました (${ref}): ${(e as Error).message}`);
+  }
+  return out;
 }
 
 function wasmDir(): string | undefined {
@@ -79,6 +112,8 @@ async function scan(argv: string[]): Promise<number> {
       output: { type: 'string' },
       root: { type: 'string' },
       config: { type: 'string' },
+      'changed-only': { type: 'boolean', default: false },
+      'diff-base': { type: 'string' },
       baseline: { type: 'string' },
       'no-baseline': { type: 'boolean', default: false },
       'update-baseline': { type: 'boolean', default: false },
@@ -113,7 +148,11 @@ async function scan(argv: string[]): Promise<number> {
   }
 
   await initParsers({ wasmDir: wasmDir() });
-  const files = collectFiles(root, positionals, config.exclude);
+  let files = collectFiles(root, positionals, config.exclude);
+  if (values['changed-only'] || values['diff-base']) {
+    const changed = getGitChangedFiles(root, values['diff-base']);
+    files = files.filter((rel) => changed.has(rel.replace(/\\/g, '/')));
+  }
   const all: Item[] = [];
   for (const rel of files) {
     const abs = path.join(root, rel);

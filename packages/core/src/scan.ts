@@ -100,7 +100,12 @@ export async function scanSource(text: string, file: string, options: ScanSource
         file,
         language,
         spec,
-        ctx: { mentions: memoizedMentions(text), customSanitizers: config.sanitizers[family] ?? [] },
+        ctx: {
+          mentions: memoizedMentions(text),
+          customSanitizers: config.sanitizers[family] ?? [],
+          customSources: config.sources?.[family] ?? [],
+          customSinks: config.sinks?.[family] ?? [],
+        },
       });
     } finally {
       tree.delete();

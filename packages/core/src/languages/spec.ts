@@ -1,5 +1,5 @@
 import type { Node } from 'web-tree-sitter';
-import type { SinkKind } from '../types';
+import type { CustomSinkRule, CustomSourceRule, SinkKind } from '../types';
 
 export type Family = 'python' | 'javascript' | 'php';
 
@@ -39,6 +39,10 @@ export interface FileContext {
   mentions(re: RegExp): boolean;
   /** 設定ファイルで追加された無害化関数 */
   customSanitizers: string[];
+  /** 設定ファイルで追加された汚染源 */
+  customSources?: CustomSourceRule[];
+  /** 設定ファイルで追加された危険なシンク関数 */
+  customSinks?: CustomSinkRule[];
 }
 
 export interface LanguageSpec {

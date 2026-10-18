@@ -1,5 +1,10 @@
 # LLMScan - AI Security Scanner
 
+[![Visual Studio Marketplace](https://vsmarketplacebadges.dev/version/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![Downloads](https://vsmarketplacebadges.dev/downloads/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![Rating](https://vsmarketplacebadges.dev/rating-star/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 English | [日本語 (Japanese)](README.ja.md)
 
 **Local Static Application Security Testing (SAST) for AI & Web Applications**
@@ -18,10 +23,12 @@ All scans run **100% locally** using Tree-sitter WebAssembly parsers. **No code 
   Traces data flow from LLM model outputs (OpenAI, Anthropic, Gemini, Ollama, LangChain, LlamaIndex, Vercel AI SDK) as well as AI agent tool calls (`tool_call.function.arguments`, `tool_input`) and **Model Context Protocol (MCP)** tool handlers (`request.params.arguments`) directly to dangerous sinks (such as dynamic execution, database queries, and raw HTML rendering).
 - **Intelligent Taint & Sanitizer Algebra**:
   Recognizes safe validation barriers including **Zod** schema parsing, **Yup**, **Pydantic** validation, cryptographic hash digests (`hashlib`, `crypto.createHash`, `bin2hex`), and type coercions (`+x`, `Number()`, `int()`, `filter_var`).
-- **Interactive VS Code Extension**:
-  Includes a dedicated Activity Bar sidebar with severity badges, real-time squiggly diagnostics, detailed hovers, one-click QuickFix suppressions, and severity filters.
-- **CI/CD & SARIF Integration**:
-  Provides a standalone CLI that generates SARIF reports for native GitHub Code Scanning integration.
+- **Custom Rule Definitions (`.llmscan.yml`)**:
+  Extend the engine with project-specific `sources`, `sinks`, and `sanitizers` per language without modifying scanner code.
+- **Interactive VS Code Extension & Auto-Fix**:
+  Includes a dedicated Activity Bar sidebar with severity badges, real-time squiggly diagnostics, detailed hovers, one-click safe code refactoring QuickFixes (`shell=False`, `ast.literal_eval`, `yaml.safe_load`, `textContent`), reason-enforced suppressions, and AI fix prompt export.
+- **CI/CD, Differential Scan & SARIF Integration**:
+  Provides a standalone CLI supporting Git-based differential scans (`--changed-only` / `--diff-base <ref>`) and SARIF reports for native GitHub Code Scanning integration.
 - **Baseline Support**:
   Create `.llmscan-baseline.json` to suppress existing technical debt and alert only on newly introduced security issues.
 
@@ -56,7 +63,7 @@ Package and install the extension locally:
 
 ```bash
 npm run package:extension
-code --install-extension packages/vscode/llm-security-scan-1.3.0.vsix
+code --install-extension packages/vscode/llm-security-scan-1.4.0.vsix
 ```
 
 See [packages/vscode/README.md](packages/vscode/README.md) for full extension documentation.
@@ -67,18 +74,20 @@ See [packages/vscode/README.md](packages/vscode/README.md) for full extension do
 
 ```bash
 node packages/cli/dist/cli.js scan [paths...] [--format text|json|sarif] [--output file]
+                                   [--changed-only | --diff-base <ref>]
                                    [--baseline file | --no-baseline | --update-baseline]
                                    [--min-confidence low|medium|high] [--fail-on low|medium|high|critical|none]
 ```
 
 - **Exit Codes**: `0` Clean / `1` Vulnerabilities meeting or exceeding `failOn` found outside baseline / `2` Execution error
+- **Differential Scan**: Use `--changed-only` (against `HEAD`) or `--diff-base origin/main` in pull request pipelines to scan only modified files.
 - The `dist/` bundle includes all dependencies and WebAssembly grammars, requiring only Node.js 18+.
 
 ### GitHub Actions Workflow Example
 
 ```yaml
 - run: npm ci && npm run build
-- run: node packages/cli/dist/cli.js scan --format sarif --output llmscan.sarif
+- run: node packages/cli/dist/cli.js scan --diff-base origin/main --format sarif --output llmscan.sarif
 - uses: github/codeql-action/upload-sarif@v3
   if: always()
   with:
@@ -111,4 +120,4 @@ LLMScan parses code strictly on your local machine using Tree-sitter WebAssembly
 
 ## 📄 License
 
-UNLICENSED
+[Apache License 2.0](LICENSE)

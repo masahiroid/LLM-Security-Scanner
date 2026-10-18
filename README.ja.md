@@ -1,5 +1,10 @@
 # LLMScan - AI Security Scanner
 
+[![Visual Studio Marketplace](https://vsmarketplacebadges.dev/version/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![Downloads](https://vsmarketplacebadges.dev/downloads/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![Rating](https://vsmarketplacebadges.dev/rating-star/masahirocom.llm-security-scan.svg)](https://marketplace.visualstudio.com/items?itemName=masahirocom.llm-security-scan)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 [English](README.md) | 日本語
 
 **AI & Web アプリケーション向け ローカル静的セキュリティ検査ツール**
@@ -20,10 +25,12 @@ LLMScan は、**Python** / **TypeScript** / **JavaScript** / **PHP** のソー�
   OpenAI, Anthropic, Gemini, Ollama, LangChain, LlamaIndex, Vercel AI SDK などの LLM 応答に加え、AI エージェントのツール呼び出し引数（`tool_call.function.arguments`, `tool_input`）や **Model Context Protocol (MCP)** のツール引数（`request.params.arguments`）が出力シンク（SQL、eval、シェル、innerHTML 等）へ渡る危険な経路を自動検出。
 - **高精度な無害化判定（誤検知防止）**:
   **Zod** スキーマ検証、**Yup**、**Pydantic**、暗号学的ハッシュ（`hashlib`, `crypto.createHash`, `bin2hex`）、単項数値変換（`+x`, `Number()`, `int()`, `filter_var`）などを安全と自動判定。
-- **インタラクティブな VS Code 拡張機能**:
-  専用のアクティビティバーアイコン、重要度バッジ、リアルタイム波線診断、詳細なホバー解説、1クリックでのクイックフィックス（抑制コメント挿入）、重要度トグルフィルターを完備。
-- **CI/CD & SARIF 連携**:
-  GitHub Code Scanning でそのまま可視化できる SARIF 形式の出力に対応したスタンドアロン CLI を同梱。
+- **カスタムルール定義 (`.llmscan.yml`)**:
+  プロジェクト固有の汚染源（`sources`）、危険なシンク（`sinks`）、無害化関数（`sanitizers`）を `.llmscan.yml` で言語別に自由に追加可能。
+- **インタラクティブな VS Code 拡張機能 & 1クリック自動修正**:
+  専用のアクティビティバーアイコン、重要度バッジ、リアルタイム波線診断、詳細なホバー解説、1クリックでの安全なコードへの自動書き換え（`shell=False`、`ast.literal_eval`、`yaml.safe_load`、`textContent` 等）や抑制コメント挿入、AI修正プロンプト出力を完備。
+- **CI/CD・差分スキャン & SARIF 連携**:
+  Git の変更差分のみを高速検査する `--changed-only` / `--diff-base <ref>` オプションや、GitHub Code Scanning でそのまま可視化できる SARIF 出力に対応した CLI を同梱。
 - **ベースライン機能**:
   既存コードの指摘を `.llmscan-baseline.json` に記録し、新規混入した脆弱性のみを通知・CI 失敗条件に設定可能。
 
@@ -34,7 +41,7 @@ LLMScan は、**Python** / **TypeScript** / **JavaScript** / **PHP** のソー�
 ```
 ./
 ├── packages/core/     解析エンジン（Tree-sitter WASM + 関数内汚染追跡）。VS Code に依存しない
-├── packages/cli/      CI 用 CLI（text / json / SARIF 出力、ベースライン）
+├── packages/cli/      CI 用 CLI（text / json / SARIF 出力、ベースライン、差分スキャン）
 ├── packages/vscode/   VS Code 拡張機能（Language Server + TreeView + アクティビティバー）
 └── scripts/           ビルド共通処理（WASM の同梱など）
 ```
@@ -58,7 +65,7 @@ npm run build        # 全パッケージのビルド
 
 ```bash
 npm run package:extension
-code --install-extension packages/vscode/llm-security-scan-1.3.0.vsix
+code --install-extension packages/vscode/llm-security-scan-1.4.0.vsix
 ```
 
 詳細な機能や画面操作については [packages/vscode/README.ja.md](packages/vscode/README.ja.md) をご覧ください。
@@ -69,18 +76,20 @@ code --install-extension packages/vscode/llm-security-scan-1.3.0.vsix
 
 ```bash
 node packages/cli/dist/cli.js scan [パス...] [--format text|json|sarif] [--output ファイル]
+                                   [--changed-only | --diff-base <ref>]
                                    [--baseline ファイル | --no-baseline | --update-baseline]
                                    [--min-confidence low|medium|high] [--fail-on low|medium|high|critical|none]
 ```
 
 - **終了コード**：`0` 問題なし / `1` ベースライン外に `failOn` 以上の指摘あり / `2` 実行エラー
+- **差分スキャン**：`--changed-only`（`HEAD` との差分）や `--diff-base origin/main` を指定すると、変更されたファイルのみを高速にスキャンできます。
 - `dist/` は依存を同梱した単体ファイル＋WASM なので、Node.js 18 以上があればどこでも動作します。
 
 ### GitHub Actions ワークフロー設定例
 
 ```yaml
 - run: npm ci && npm run build
-- run: node packages/cli/dist/cli.js scan --format sarif --output llmscan.sarif
+- run: node packages/cli/dist/cli.js scan --diff-base origin/main --format sarif --output llmscan.sarif
 - uses: github/codeql-action/upload-sarif@v3
   if: always()
   with:
@@ -113,5 +122,5 @@ LLMScan は手元の環境内で Tree-sitter WebAssembly によりローカル�
 
 ## 📄 ライセンス
 
-UNLICENSED
+[Apache License 2.0](LICENSE)
 
