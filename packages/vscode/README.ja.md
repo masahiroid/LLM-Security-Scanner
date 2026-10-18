@@ -23,8 +23,10 @@ LLMScan は、**Python**、**TypeScript**、**JavaScript**、**PHP** のコー�
   SQL インジェクション（生クエリ・各種 ORM）、OS コマンドインジェクション（`exec`, `spawn`, `shell=True`）、コード実行（`eval`, `new Function`）、安全でないデシリアライズ（`pickle`, `unserialize`, `yaml.unsafe_load`）、XSS、テンプレートインジェクション（SSTI）、ファイルインクルード（パストラバーサル）。
 - **OWASP LLM05（不適切な出力処理）& Agentic セキュリティの追跡**:
   OpenAI、Anthropic、Gemini、Ollama、LangChain、LlamaIndex、Vercel AI SDK 等の応答に加え、AI エージェントのツール呼び出し引数（`tool_call.function.arguments`, `tool_input`）や **Model Context Protocol (MCP)** のツール引数（`request.params.arguments`）を SQL・eval・シェル・innerHTML に渡している危険な箇所を特定。
-- **サイドバー・アクティビティバー連携**:
-  専用のアクティビティバーアイコン（`llm.svg`）、指摘件数バッジ、重要度別のアイコン表示、行単位のジャンプ、高重大度（High / Critical）のみを絞り込むフィルターボタンを搭載。
+- **クロスファイル（複数ファイル間）汚染追跡 (`ProjectIndex`)**:
+  ワークスペース内の各ファイルで定義された関数の要約（汚染源・無害化関数・危険なシンクラッパー）を自動インデックス化し、別ファイルのヘルパー関数をまたぐ `Source -> Cross-File Helper -> Sink` の経路を追跡。
+- **サイドバー・データフローグラフ & アクティビティバー連携**:
+  専用のアクティビティバーアイコン（`llm.svg`）、指摘件数バッジ、視覚的なフローチャートで汚染経路を確認しクリックで該当コード行へジャンプできる**データフローグラフパネル**（`$(type-hierarchy-sub)`）を搭載。
 - **高精度な無害化判定**:
   Zod、Yup、Pydantic によるスキーマ検証、暗号学的ハッシュ（`hashlib`, `crypto.createHash`, `bin2hex`）、単項数値変換（`+x`, `Number()`, `int()`, `filter_var`）などを安全と自動判定。
 - **充実したホバー解説 & 1クリック自動修正クイックフィックス**:
@@ -39,6 +41,7 @@ LLMScan は、**Python**、**TypeScript**、**JavaScript**、**PHP** のコー�
 | 機能 | 操作 |
 |---|---|
 | **リアルタイム診断** | 対象言語のファイルを開くと自動で解析。問題パネルやエディタ内に波線表示されます。 |
+| **データフローグラフ表示** | サイドバーの各指摘にある `$(type-hierarchy-sub)` アイコンをクリックすると、視覚的なフローチャートが開き、各ノードをクリックして該当コード行へ移動できます。 |
 | **経路の確認** | 指摘の「関連情報」に「入力の出どころ → 代入 → 危険な処理」の全ステップが表示されます。 |
 | **詳細解説** | 波線にカーソルを合わせると、危険な理由・安全な書き方・CWE リンクを表示します。 |
 | **1クリック自動修正** | 電球メニューから安全な関数・オプションへの自動置換や、抑制コメントの挿入を行えます。 |

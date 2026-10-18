@@ -55,4 +55,50 @@ describe('Report & AI Remediation Prompt Generator', () => {
     const md = generateAiRemediationPrompt([]);
     expect(md).toContain('LLMScan');
   });
+
+  it('v1.6: データフローグラフ Webview HTML が日英両対応で正しく生成される', async () => {
+    const { renderDataflowGraphHtml } = await import('../src/dataflow-webview');
+    const htmlJa = renderDataflowGraphHtml(
+      {
+        ruleCode: 'LLM05-SQLI-001',
+        title: 'SQL インジェクション',
+        severity: 'Critical',
+        cwe: 'CWE-89',
+        owaspId: 'LLM05:2025',
+        owaspTitle: '不適切な出力処理',
+        owaspUrl: 'https://genai.owasp.org/',
+        relativePath: 'src/handler.py',
+        message: 'LLM の応答が SQL に渡されています',
+        why: 'SQL 文が改ざんされます',
+        recommendation: 'プレースホルダを使用します',
+        nodes: [
+          {
+            stepIndex: 1,
+            totalSteps: 2,
+            role: 'source',
+            line: 10,
+            column: 5,
+            message: 'LLM の応答: ask_llm_service()',
+            codeLine: 'llm_sql = ask_llm_service(client, q)',
+          },
+          {
+            stepIndex: 2,
+            totalSteps: 2,
+            role: 'sink',
+            line: 11,
+            column: 5,
+            message: '危険な処理: run_Unsafe_sql(...) -> conn.execute',
+            codeLine: 'run_Unsafe_sql(llm_sql)',
+          },
+        ],
+      },
+      true,
+    );
+    expect(htmlJa).toContain('LLM05-SQLI-001');
+    expect(htmlJa).toContain('汚染源 (Source)');
+    expect(htmlJa).toContain('危険な処理 (Sink)');
+    expect(htmlJa).toContain('data-line="10"');
+    expect(htmlJa).toContain('data-line="11"');
+  });
 });
+

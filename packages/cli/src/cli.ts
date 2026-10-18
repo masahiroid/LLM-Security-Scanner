@@ -6,11 +6,13 @@ import {
   type Confidence,
   type Finding,
   MAX_FILE_SIZE_BYTES,
+  ProjectIndex,
   type ScanConfig,
   type Severity,
   SEVERITY_ORDER,
   collectFiles,
   createBaseline,
+  indexFileSummaries,
   initParsers,
   loadConfig,
   meetsConfidence,
@@ -20,7 +22,7 @@ import {
   writeBaseline,
 } from '@llmscan/core';
 
-const VERSION = '1.5.0';
+const VERSION = '1.6.0';
 const EXIT_CODE_CLEAN = 0;
 const EXIT_CODE_FINDINGS = 1;
 const EXIT_CODE_ERROR = 2;
@@ -162,13 +164,16 @@ async function scan(argv: string[]): Promise<number> {
   }
 
   await initParsers({ wasmDir: wasmDir() });
-  let files = collectFiles(root, positionals, config.exclude);
+  const allProjectFiles = collectFiles(root, positionals, config.exclude);
+  let files = allProjectFiles;
   if (values['changed-only'] || values['diff-base']) {
     const changed = getGitChangedFiles(root, values['diff-base']);
-    files = files.filter((rel) => changed.has(rel.replace(/\\/g, '/')));
+    files = allProjectFiles.filter((rel) => changed.has(rel.replace(/\\/g, '/')));
   }
-  const all: Item[] = [];
-  for (const rel of files) {
+
+  const projectIndex = new ProjectIndex();
+  const loadedTexts = new Map<string, string>();
+  for (const rel of allProjectFiles) {
     const abs = path.join(root, rel);
     let text: string;
     try {
@@ -177,7 +182,16 @@ async function scan(argv: string[]): Promise<number> {
       continue;
     }
     if (text.length > MAX_FILE_SIZE_BYTES) continue; // 巨大な生成ファイルは対象外
-    const findings = await scanSource(text, abs, { relativePath: rel, config });
+    loadedTexts.set(rel, text);
+    await indexFileSummaries(text, abs, projectIndex, { config });
+  }
+
+  const all: Item[] = [];
+  for (const rel of files) {
+    const text = loadedTexts.get(rel);
+    if (text === undefined) continue;
+    const abs = path.join(root, rel);
+    const findings = await scanSource(text, abs, { relativePath: rel, config, projectIndex });
     for (const finding of findings) {
       if (meetsConfidence(finding, config.minConfidence)) all.push({ finding, relativePath: rel });
     }

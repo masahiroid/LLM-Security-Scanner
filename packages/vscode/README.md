@@ -21,8 +21,10 @@ All scans run **100% locally** inside your editor using Tree-sitter WebAssembly.
   SQL Injection (Raw ORM & parameterized queries), Command Injection (`exec`, `spawn`, `shell=True`), Code Injection (`eval`, `new Function`), Insecure Deserialization (`pickle`, `unserialize`, `yaml.unsafe_load`), Cross-Site Scripting (XSS), Server-Side Template Injection (SSTI), and Path Traversal / File Inclusion.
 - **OWASP LLM05 (Insecure Output Handling) & Agentic Security**:
   Tracks responses from OpenAI, Anthropic, Gemini, Ollama, LangChain, LlamaIndex, and Vercel AI SDK, as well as AI Agent tool calls (`tool_call.function.arguments`, `tool_input`) and **Model Context Protocol (MCP)** tool handlers (`request.params.arguments`) directly to dangerous sinks (`innerHTML`, `sqlite3.execute`, `subprocess.run`, `eval`).
-- **Interactive Tree View & Activity Bar**:
-  Dedicated Activity Bar icon (`llm.svg`) and sidebar view with severity badges, line-by-line navigation, and a quick toggle filter for High/Critical issues.
+- **Cross-File Taint Analysis (`ProjectIndex`)**:
+  Automatically indexes function summaries across files in your workspace to track LLM outputs, user inputs, custom sanitizers, and sink wrappers across module boundaries.
+- **Interactive Tree View, Dataflow Graph & Activity Bar**:
+  Dedicated Activity Bar icon (`llm.svg`), sidebar view with severity badges, and an interactive **Dataflow Taint Path Webview** (`$(type-hierarchy-sub)`) where clicking any node jumps directly to the source line.
 - **Intelligent Taint Tracking & Sanitizers**:
   Built-in understanding of safe sanitizers: Zod schema validation, Yup, Pydantic, cryptographic hash digests (`hashlib`, `crypto.createHash`, `bin2hex`), and type coercion (`+x`, `Number()`, `int()`, `filter_var`).
 - **Actionable Hovers & 1-Click Safe Refactoring QuickFixes**:
@@ -37,6 +39,7 @@ All scans run **100% locally** inside your editor using Tree-sitter WebAssembly.
 | Feature | Action |
 |---|---|
 | **Real-time Diagnostics** | Automatically scans active files and highlights vulnerabilities in the Problems panel and editor squiggly lines. |
+| **Interactive Dataflow Graph** | Click the `$(type-hierarchy-sub)` icon on any finding in the sidebar to open the visual taint path flowchart and click nodes to jump to code lines. |
 | **Dataflow Trace** | Under "Related Information", view the complete path: `Source -> Assignment -> Sink`. |
 | **Detailed Explanation** | Hover over findings to view why it is dangerous, safe remediation code, and CWE links. |
 | **One-Click Safe Auto-Fix** | Click the QuickFix lightbulb to safely refactor dangerous calls or insert `# llmscan-ignore[RULE]: TODO Reason`. |

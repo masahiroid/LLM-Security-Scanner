@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG, meetsConfidence, parseConfig, parseSuppressions, scanSource, toSarif } from '../src';
+import {
+  DEFAULT_CONFIG,
+  ProjectIndex,
+  indexFileSummaries,
+  meetsConfidence,
+  parseConfig,
+  parseSuppressions,
+  scanSource,
+  toSarif,
+} from '../src';
 
 const vulnerable = `from flask import request
 import sqlite3
@@ -360,5 +369,53 @@ const apiKey = "sk-proj-1234567890abcdefghijklmnopqrstuvwxyz";
     expect(findings[0].ruleId).toBe('LLM02-SECRET-001');
     expect(findings[0].severity).toBe('high');
   });
+
+  it('v1.6: ProjectIndex を用いて複数ファイルをまたぐ Source -> Helper -> Sink / Sanitizer を追跡する', async () => {
+    const aiServicePy = `
+def ask_llm_service(client, prompt: str):
+    resp = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return resp.choices[0].message.content
+`;
+    const dbHelperPy = `
+import sqlite3
+def run_Unsafe_sql(query: str):
+    conn = sqlite3.connect("app.db")
+    conn.execute("SELECT * FROM items WHERE " + query)
+`;
+    const sanitizerPy = `
+import bleach
+def clean_user_html(raw: str):
+    return bleach.clean(raw)
+`;
+    const handlerPy = `
+from flask import Markup, request
+from ai_service import ask_llm_service
+from db_helper import run_Unsafe_sql
+from sanitizer import clean_user_html
+
+def handle_request(client):
+    q = request.args.get("q")
+    llm_sql = ask_llm_service(client, q)
+    run_Unsafe_sql(llm_sql)
+    safe_out = clean_user_html(q)
+    return Markup(safe_out)
+`;
+
+    const projectIndex = new ProjectIndex();
+    await indexFileSummaries(aiServicePy, 'ai_service.py', projectIndex);
+    await indexFileSummaries(dbHelperPy, 'db_helper.py', projectIndex);
+    await indexFileSummaries(sanitizerPy, 'sanitizer.py', projectIndex);
+    await indexFileSummaries(handlerPy, 'handler.py', projectIndex);
+
+    const findings = await scanSource(handlerPy, 'handler.py', { projectIndex });
+    expect(findings).toHaveLength(1);
+    expect(findings[0].ruleId).toBe('LLM05-SQLI-001');
+    expect(findings[0].origin).toBe('llm');
+    expect(findings[0].confidence).toBe('high');
+  });
 });
+
 

@@ -5,12 +5,13 @@ import {
   DEFAULT_CONFIG,
   DEFAULT_DEBOUNCE_MS,
   type Finding,
-  type LanguageId,
   MAX_FILE_SIZE_BYTES,
+  ProjectIndex,
   type ScanConfig,
   collectFiles,
   createBaseline,
   createExcludeMatcher,
+  indexFileSummaries,
   initParsers,
   loadConfig,
   meetsConfidence,
@@ -21,7 +22,6 @@ import {
 import {
   type CodeAction,
   CodeActionKind,
-  type Diagnostic,
   type Hover,
   MarkupKind,
   ProposedFeatures,
@@ -69,6 +69,7 @@ const isJa = () => clientLocale.startsWith('ja') || (!clientLocale && (process.e
 /** URI ごとの表示中の指摘（ホバー・コードアクション用） */
 const shown = new Map<string, Finding[]>();
 const timers = new Map<string, NodeJS.Timeout>();
+const projectIndex = new ProjectIndex();
 
 const LANGUAGE_IDS = LANGUAGE_ID_MAP;
 
@@ -119,8 +120,6 @@ async function refreshSettings(): Promise<void> {
 
 // ---------------------------------------------------------------- 診断
 
-
-
 interface ScanTarget {
   uri: string;
   file: string;
@@ -135,7 +134,13 @@ async function findingsFor(target: ScanTarget): Promise<Finding[]> {
   if (root?.excluded(rel)) return [];
   const config = root?.config;
   const language = target.languageId ? LANGUAGE_IDS[target.languageId] : undefined;
-  const findings = await scanSource(target.text, target.file, { relativePath: rel, config, language });
+  await indexFileSummaries(target.text, target.file, projectIndex, { config, language });
+  const findings = await scanSource(target.text, target.file, {
+    relativePath: rel,
+    config,
+    language,
+    projectIndex,
+  });
   const min: Confidence = settings.minConfidence || config?.minConfidence || 'medium';
   return findings.filter(
     (f) => meetsConfidence(f, min) && (settings.showBaselined || !root?.baseline?.has(f.fingerprint)),
@@ -199,11 +204,21 @@ function* workspaceFiles(): Generator<WorkspaceFile> {
   }
 }
 
+async function indexAllWorkspaceFiles(items: WorkspaceFile[]): Promise<void> {
+  projectIndex.clear();
+  for (const { root, target } of items) {
+    const language = target.languageId ? LANGUAGE_IDS[target.languageId] : undefined;
+    await indexFileSummaries(target.text, target.file, projectIndex, { config: root.config, language });
+  }
+}
+
 async function scanWorkspace(): Promise<{ files: number; findings: number }> {
   void connection.sendNotification('llmscan/scanStarted');
+  const items = Array.from(workspaceFiles());
+  await indexAllWorkspaceFiles(items);
   let total = 0;
   let files = 0;
-  for (const { target } of workspaceFiles()) {
+  for (const { target } of items) {
     files++;
     total += await publish(target);
   }
@@ -223,12 +238,15 @@ async function updateBaseline(): Promise<{ written: string[] }> {
     connection.window.showWarningMessage(msg);
     return { written: [] };
   }
+  const items = Array.from(workspaceFiles());
+  await indexAllWorkspaceFiles(items);
   const byRoot = new Map<Root, { finding: Finding; relativePath: string }[]>(roots.map((r) => [r, []]));
-  for (const { root, rel, target } of workspaceFiles()) {
+  for (const { root, rel, target } of items) {
     const findings = await scanSource(target.text, target.file, {
       relativePath: rel,
       config: root.config,
       language: target.languageId ? LANGUAGE_IDS[target.languageId] : undefined,
+      projectIndex,
     });
     const min = settings.minConfidence || root.config.minConfidence;
     for (const finding of findings) if (meetsConfidence(finding, min)) byRoot.get(root)!.push({ finding, relativePath: rel });
