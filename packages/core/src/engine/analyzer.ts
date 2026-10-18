@@ -16,6 +16,7 @@ import {
   short,
   step,
 } from './ast-utils';
+import { detectHardcodedSecret, extractSystemPromptTargets } from './llm-detectors';
 import { Scope } from './scope';
 import { type SinkOverrides, SinkReporter } from './sink-reporter';
 import { type SharedState, type Summary } from './summary';
@@ -139,17 +140,23 @@ export class Analyzer {
         return this.evForeach(node);
 
       // 文字列の組み立て
-      case 'string':
+      case 'string': {
+        const secret = detectHardcodedSecret(node);
+        if (secret) this.reporter.reportSecret(node, secret, this.scope.functionName);
         return this.evAll(
           named(node).filter((n) => n.type === 'interpolation'),
           true,
         );
+      }
       case 'concatenated_string':
       case 'template_string':
       case 'encapsed_string':
       case 'heredoc':
-      case 'heredoc_body':
+      case 'heredoc_body': {
+        const secret = detectHardcodedSecret(node);
+        if (secret) this.reporter.reportSecret(node, secret, this.scope.functionName);
         return this.evAll(named(node), true);
+      }
       case 'binary_operator':
       case 'binary_expression':
         return this.evBinary(node);
@@ -440,6 +447,9 @@ export class Analyzer {
     const sink = this.spec.sinkForCall(call, this.input.ctx);
     if (sink) {
       for (const arg of sink.args) this.checkSink(sink.kind, arg, node, call.path);
+    }
+    for (const sysTarget of extractSystemPromptTargets(call, this.spec, this.input.ctx)) {
+      this.checkSink('prompti', sysTarget, node, `${call.path}（システムプロンプト）`);
     }
     for (const rule of this.input.ctx.customSinks ?? []) {
       if (matchesCustom(call.path, [rule.pattern])) {

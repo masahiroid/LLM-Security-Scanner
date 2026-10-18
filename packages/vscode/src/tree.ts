@@ -88,7 +88,7 @@ export class FindingsTreeDataProvider implements vscode.TreeDataProvider<Finding
         const line = d.range.start.line + 1;
         const code = getDiagnosticRuleCode(d);
         const shortMsg = d.message.replace(/（確信度: .*?）/, '');
-        const isLlm = code.startsWith('LLM05');
+        const isLlm = code.startsWith('LLM0');
         const severityLabel =
           d.severity === vscode.DiagnosticSeverity.Error
             ? 'High'

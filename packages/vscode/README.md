@@ -95,6 +95,10 @@ sinks:                       # Custom dangerous sink functions
 | `{PY,JS}-SSTI-001` | Server-Side Template Injection | High |
 | `{PY,JS,PHP}-XSS-001` | Cross-Site Scripting (`innerHTML`, `echo`) | Medium |
 | `PHP-FILEINC-001` | File Inclusion (`include`, `require`) | High |
+| `{PY,JS,PHP}-SSRF-001` | Server-Side Request Forgery (`fetch`, `requests.get`) | High |
+| `{PY,JS,PHP}-PATH-001` | Path Traversal (`fs.readFile`, `open`) | High |
+| `LLM01-PROMPTI-001` | **OWASP LLM01** System Prompt Injection | High |
+| `LLM02-SECRET-001` | **OWASP LLM02** Hardcoded API Key / Secret | High |
 | `LLM05-*-001` | **OWASP LLM05** Insecure LLM Output Handling | Critical / High |
 | `LLMSCAN-SUPPRESS-001` | Suppression comment without reason | Low |
 

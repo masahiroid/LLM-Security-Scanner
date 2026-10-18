@@ -20,7 +20,7 @@ import {
   writeBaseline,
 } from '@llmscan/core';
 
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const EXIT_CODE_CLEAN = 0;
 const EXIT_CODE_FINDINGS = 1;
 const EXIT_CODE_ERROR = 2;

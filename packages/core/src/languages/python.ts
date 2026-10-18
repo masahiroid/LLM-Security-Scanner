@@ -1,12 +1,14 @@
 import {
   LLM_TOOL_PATH_PATTERN,
   MCP_TOOL_PARAM_PATTERN,
+  PY_PATH_SINK_REGEX,
   PY_SAFE_CRYPTO_REGEX,
   PY_SAFE_DATETIME_REGEX,
   PY_SAFE_IP_REGEX,
   PY_SAFE_MATH_REGEX,
   PY_SAFE_PRIMITIVES_REGEX,
   PY_SAFE_SCHEMA_REGEX,
+  PY_SSRF_SINK_REGEX,
 } from '../constants';
 import { type CallInfo, type LanguageSpec, matchesCustom } from './spec';
 
@@ -124,6 +126,18 @@ export const python: LanguageSpec = {
     if (/^(markupsafe\.|flask\.)?Markup$/.test(path) || /(^|\.)(mark_safe|SafeString)$/.test(path)) {
       return { kind: 'xss', args: first };
     }
+
+    // --- SSRF ---
+    if (PY_SSRF_SINK_REGEX.test(path)) {
+      const urlArg = call.kwargs.get('url');
+      return { kind: 'ssrf', args: urlArg ? [urlArg] : first };
+    }
+
+    // --- パストラバーサル ---
+    if (PY_PATH_SINK_REGEX.test(path)) {
+      return { kind: 'pathtrav', args: first };
+    }
+
     return null;
   },
 
@@ -140,7 +154,9 @@ export const python: LanguageSpec = {
       return ['xss'];
     }
     if (/^(shlex|pipes)\.quote$/.test(path) || (path === 'quote' && ctx.mentions(/shlex/))) return ['cmdi'];
-    if (/^os\.path\.basename$/.test(path)) return ['fileinc'];
+    if (/^os\.path\.basename$/.test(path) || /^werkzeug\.utils\.secure_filename$/.test(path) || path === 'secure_filename') {
+      return ['fileinc', 'pathtrav'];
+    }
     return null;
   },
 

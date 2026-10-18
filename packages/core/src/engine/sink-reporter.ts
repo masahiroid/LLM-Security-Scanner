@@ -52,7 +52,11 @@ export class SinkReporter {
       t.origin === 'llm' ? 'LLM の応答' : t.origin === 'user' ? 'ユーザー入力' : '関数の引数';
     const how = t.built ? 'を組み立てた文字列' : '';
     const prefix =
-      t.origin === 'llm' ? `[LLM05 不適切な出力処理 / ${meta.title}]` : `[${meta.title}]`;
+      kind === 'prompti'
+        ? `[LLM01 プロンプトインジェクション / ${meta.title}]`
+        : t.origin === 'llm'
+          ? `[LLM05 不適切な出力処理 / ${meta.title}]`
+          : `[${meta.title}]`;
     const tail =
       t.origin === 'param'
         ? '。呼び出し元で外部入力が渡ると危険です'
@@ -71,6 +75,32 @@ export class SinkReporter {
       language: this.target.language,
       range: rangeOf(arg),
       trace: [...t.trace, step(anchor, `危険な処理: ${label}`)],
+      functionName: currentFunctionName,
+    });
+  }
+
+  /**
+   * ハードコードされた API キー・シークレット（OWASP LLM02）を報告する
+   */
+  reportSecret(node: Node, maskedKey: string, currentFunctionName: string): void {
+    const kind: SinkKind = 'secret';
+    const ruleId = ruleIdFor(kind, 'user', this.target.rulePrefix);
+    const dedupeKey = `${ruleId}:${node.startIndex}:${node.endIndex}`;
+    if (this.reported.has(dedupeKey)) return;
+    this.reported.add(dedupeKey);
+
+    const meta = KIND_META[kind];
+    this.findings.push({
+      ruleId,
+      kind,
+      severity: meta.baseSeverity,
+      confidence: 'high',
+      origin: 'user',
+      message: `[LLM02 機密情報の漏洩 / ${meta.title}] ソースコード内に API キー（${maskedKey}）が直接記述されています`,
+      file: this.target.file,
+      language: this.target.language,
+      range: rangeOf(node),
+      trace: [step(node, `ハードコードされた機密情報: ${maskedKey}`)],
       functionName: currentFunctionName,
     });
   }

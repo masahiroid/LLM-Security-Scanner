@@ -280,5 +280,85 @@ def handle(prompt):
     expect(findings[0].origin).toBe('llm');
     expect(findings[0].trace[0].message).toContain('社内LLM応答');
   });
+
+  it('v1.5: SSRF (PY-SSRF-001, JS-SSRF-001, LLM05-SSRF-001) を検出する', async () => {
+    const pyCode = `
+import requests
+def fetch_webhook():
+    target = request.args.get("url")
+    requests.get(target)
+`;
+    const pyFindings = await scanSource(pyCode, 'webhook.py');
+    expect(pyFindings.some((f) => f.ruleId === 'PY-SSRF-001')).toBe(true);
+
+    const jsLlmCode = `
+export async function runAgent(client: any, prompt: string) {
+  const res = await client.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: prompt }],
+  });
+  const url = res.choices[0].message.content;
+  await fetch(url);
+}
+`;
+    const jsFindings = await scanSource(jsLlmCode, 'agent.ts');
+    expect(jsFindings.some((f) => f.ruleId === 'LLM05-SSRF-001')).toBe(true);
+  });
+
+  it('v1.5: パストラバーサル (PY-PATH-001, JS-PATH-001) の検出と basename 無害化', async () => {
+    const pyCode = `
+import os
+def read_doc():
+    name = request.args.get("file")
+    open("/var/data/" + name).read()
+    safe_name = os.path.basename(name)
+    open("/var/data/" + safe_name).read()
+`;
+    const pyFindings = await scanSource(pyCode, 'docs.py');
+    const pathFindings = pyFindings.filter((f) => f.ruleId === 'PY-PATH-001');
+    expect(pathFindings).toHaveLength(1);
+    expect(pathFindings[0].range.start.line).toBe(4);
+  });
+
+  it('v1.5: OWASP LLM01 システムプロンプトインジェクション (LLM01-PROMPTI-001) を検出する', async () => {
+    const pyCode = `
+def ask_ai(client):
+    role_instruction = request.args.get("persona")
+    res = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": f"You are {role_instruction}"},
+            {"role": "user", "content": "Hello"},
+        ],
+    )
+    return res
+`;
+    const pyFindings = await scanSource(pyCode, 'chat.py');
+    expect(pyFindings.some((f) => f.ruleId === 'LLM01-PROMPTI-001')).toBe(true);
+
+    const tsCode = `
+export async function generate(ai: any, req: any) {
+  const customSys = req.query.sys;
+  await ai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "developer", content: "Instruction: " + customSys },
+    ],
+  });
+}
+`;
+    const tsFindings = await scanSource(tsCode, 'chat.ts');
+    expect(tsFindings.some((f) => f.ruleId === 'LLM01-PROMPTI-001')).toBe(true);
+  });
+
+  it('v1.5: OWASP LLM02 ハードコードされた API キー (LLM02-SECRET-001) を検出する', async () => {
+    const code = `
+const apiKey = "sk-proj-1234567890abcdefghijklmnopqrstuvwxyz";
+`;
+    const findings = await scanSource(code, 'config.ts');
+    expect(findings).toHaveLength(1);
+    expect(findings[0].ruleId).toBe('LLM02-SECRET-001');
+    expect(findings[0].severity).toBe('high');
+  });
 });
 
