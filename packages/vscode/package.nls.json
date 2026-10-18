@@ -6,6 +6,7 @@
   "llmscan.commands.toggleFilter": "LLMScan: Toggle High/Critical severity filter",
   "llmscan.commands.createBaseline": "LLMScan: Create or update baseline with current findings",
   "llmscan.commands.clearBaseline": "LLMScan: Clear baseline (Restore all findings)",
+  "llmscan.commands.showDataflowGraph": "LLMScan: Show Interactive Dataflow Graph",
   "llmscan.views.findings": "Security Findings",
   "llmscan.config.enable": "Enable or disable LLMScan security analysis",
   "llmscan.config.minConfidence": "Minimum confidence level to display",

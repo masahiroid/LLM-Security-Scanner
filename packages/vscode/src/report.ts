@@ -1,7 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type * as vscode from 'vscode';
-import { KIND_META, type LanguageId, SUPPRESSION_RULE_ID, type SinkKind, getLanguageFamily, languageForFile } from '@llmscan/core';
+import { type LanguageId, SUPPRESSION_RULE_ID, findKindMetaForRuleId, getLanguageFamily, languageForFile } from '@llmscan/core';
+import { DEFAULT_FALLBACK_RULE_ID } from './server/constants';
 
 export interface FindingReportItem {
   uri: vscode.Uri;
@@ -19,10 +20,15 @@ export interface FindingReportItem {
 }
 
 /** Diagnostic からルール ID 文字列を取り出す */
-export function getDiagnosticRuleCode(d: vscode.Diagnostic, fallback = ''): string {
+export function getDiagnosticRuleCode(d: vscode.Diagnostic, fallback = DEFAULT_FALLBACK_RULE_ID): string {
   if (typeof d.code === 'string') return d.code;
   if (typeof d.code === 'object' && d.code !== null) return String(d.code.value);
   return fallback;
+}
+
+/** ルール ID が Critical 相当かどうか判定する */
+export function isCriticalRuleCode(ruleCode: string): boolean {
+  return ruleCode.startsWith('LLM05-') || ruleCode.includes('CMDI') || ruleCode.includes('CODEI');
 }
 
 /** 表示対象となる llmscan の指摘かどうか判定する */
@@ -70,12 +76,11 @@ export function collectReportItems(vscodeApi: typeof vscode, highOnly = false): 
     for (const d of activeDiags) {
       const line = d.range.start.line + 1;
       const column = d.range.start.character + 1;
-      const ruleCode = getDiagnosticRuleCode(d, 'SECURITY-001');
+      const ruleCode = getDiagnosticRuleCode(d);
 
-      const isCritical = ruleCode.startsWith('LLM05-') || ruleCode.includes('CMDI') || ruleCode.includes('CODEI');
       const severity: 'Critical' | 'High' | 'Medium' | 'Low' =
         d.severity === vscodeApi.DiagnosticSeverity.Error
-          ? (isCritical ? 'Critical' : 'High')
+          ? (isCriticalRuleCode(ruleCode) ? 'Critical' : 'High')
           : d.severity === vscodeApi.DiagnosticSeverity.Warning
             ? 'Medium'
             : 'Low';
@@ -102,12 +107,9 @@ export function collectReportItems(vscodeApi: typeof vscode, highOnly = false): 
       // KIND_META から推奨修正と CWE を取得
       let recommendation: string | undefined;
       let cwe: string | undefined;
-      const metaKey = Object.keys(KIND_META).find((k) =>
-        ruleCode.toLowerCase().includes(KIND_META[k as SinkKind].code.toLowerCase()),
-      ) as SinkKind | undefined;
+      const meta = findKindMetaForRuleId(ruleCode);
 
-      if (metaKey) {
-        const meta = KIND_META[metaKey];
+      if (meta) {
         cwe = meta.cwe;
         const family = getLanguageFamily(langId);
         recommendation = isJa ? meta.fix[family] : meta.fixEn[family];

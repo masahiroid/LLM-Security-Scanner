@@ -277,3 +277,14 @@ export function owaspForRuleId(ruleId: string) {
   if (ruleId.startsWith('LLM05')) return OWASP_LLM05;
   return OWASP_A05;
 }
+
+export function findKindMetaForRuleId(ruleId: string): KindMeta | undefined {
+  const upper = ruleId.toUpperCase();
+  for (const key of Object.keys(KIND_META) as SinkKind[]) {
+    if (upper.includes(KIND_META[key].code)) {
+      return KIND_META[key];
+    }
+  }
+  return undefined;
+}
+

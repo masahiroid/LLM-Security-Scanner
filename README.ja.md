@@ -27,8 +27,10 @@ LLMScan は、**Python** / **TypeScript** / **JavaScript** / **PHP** のソー�
   **Zod** スキーマ検証、**Yup**、**Pydantic**、暗号学的ハッシュ（`hashlib`, `crypto.createHash`, `bin2hex`）、単項数値変換（`+x`, `Number()`, `int()`, `filter_var`）などを安全と自動判定。
 - **カスタムルール定義 (`.llmscan.yml`)**:
   プロジェクト固有の汚染源（`sources`）、危険なシンク（`sinks`）、無害化関数（`sanitizers`）を `.llmscan.yml` で言語別に自由に追加可能。
-- **インタラクティブな VS Code 拡張機能 & 1クリック自動修正**:
-  専用のアクティビティバーアイコン、重要度バッジ、リアルタイム波線診断、詳細なホバー解説、1クリックでの安全なコードへの自動書き換え（`shell=False`、`ast.literal_eval`、`yaml.safe_load`、`textContent` 等）や抑制コメント挿入、AI修正プロンプト出力を完備。
+- **クロスファイル（複数ファイル間）汚染追跡 (`ProjectIndex`)**:
+  ワークスペース内の各ファイルで定義された関数の要約（汚染源・無害化関数・危険なシンクラッパー）を自動インデックス化し、別ファイルのヘルパー関数を経由する `Source -> Cross-File Helper -> Sink` の経路も高精度に追跡。
+- **インタラクティブな VS Code 拡張機能・データフローグラフ & 1クリック自動修正**:
+  専用のアクティビティバーアイコン、重要度バッジ、視覚的なフローチャートで経路を確認しクリックで該当行へジャンプできる**データフローグラフパネル**、リアルタイム波線診断、1クリックでの安全なコードへの自動書き換え（`shell=False`、`ast.literal_eval`、`yaml.safe_load`、`textContent` 等）や抑制コメント挿入、AI修正プロンプト出力を完備。
 - **CI/CD・差分スキャン & SARIF 連携**:
   Git の変更差分のみを高速検査する `--changed-only` / `--diff-base <ref>` オプションや、GitHub Code Scanning でそのまま可視化できる SARIF 出力に対応した CLI を同梱。
 - **ベースライン機能**:
@@ -40,9 +42,9 @@ LLMScan は、**Python** / **TypeScript** / **JavaScript** / **PHP** のソー�
 
 ```
 ./
-├── packages/core/     解析エンジン（Tree-sitter WASM + 関数内汚染追跡）。VS Code に依存しない
+├── packages/core/     解析エンジン（Tree-sitter WASM + クロスファイル汚染追跡）。VS Code に依存しない
 ├── packages/cli/      CI 用 CLI（text / json / SARIF 出力、ベースライン、差分スキャン）
-├── packages/vscode/   VS Code 拡張機能（Language Server + TreeView + アクティビティバー）
+├── packages/vscode/   VS Code 拡張機能（Language Server + TreeView + データフローグラフ）
 └── scripts/           ビルド共通処理（WASM の同梱など）
 ```
 
@@ -65,7 +67,7 @@ npm run build        # 全パッケージのビルド
 
 ```bash
 npm run package:extension
-code --install-extension packages/vscode/llm-security-scan-1.5.0.vsix
+code --install-extension packages/vscode/llm-security-scan-1.6.0.vsix
 ```
 
 詳細な機能や画面操作については [packages/vscode/README.ja.md](packages/vscode/README.ja.md) をご覧ください。

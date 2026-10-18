@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { analyze } from './engine';
+import { ProjectIndex, analyze, extractSummaries } from './engine';
 import { javascript } from './languages/javascript';
 import { php } from './languages/php';
 import { python } from './languages/python';
@@ -23,6 +23,8 @@ export interface ScanSourceOptions {
   relativePath?: string;
   language?: LanguageId;
   config?: ScanConfig;
+  /** クロスファイル解析用のプロジェクト関数要約インデックス */
+  projectIndex?: ProjectIndex;
 }
 
 interface Suppression {
@@ -80,6 +82,42 @@ export function meetsConfidence(f: Finding, min: Confidence): boolean {
 }
 
 /**
+ * 1 ファイルの関数要約を抽出して ProjectIndex に登録する（クロスファイル解析の第1パス用）
+ */
+export async function indexFileSummaries(
+  text: string,
+  file: string,
+  projectIndex: ProjectIndex,
+  options: ScanSourceOptions = {},
+): Promise<void> {
+  const language = options.language ?? languageForFile(file);
+  if (!language) return;
+  const config = options.config ?? DEFAULT_CONFIG;
+  const spec = SPECS[language];
+  const parser = await getParser(language);
+  const tree = parser.parse(text);
+  if (!tree) return;
+  const family = spec.family;
+  try {
+    const summaries = extractSummaries({
+      root: tree.rootNode,
+      file,
+      language,
+      spec,
+      ctx: {
+        mentions: memoizedMentions(text),
+        customSanitizers: config.sanitizers[family] ?? [],
+        customSources: config.sources?.[family] ?? [],
+        customSinks: config.sinks?.[family] ?? [],
+      },
+    });
+    projectIndex.updateFile(file, family, summaries);
+  } finally {
+    tree.delete();
+  }
+}
+
+/**
  * ソースコード 1 ファイルを解析する。
  * 抑制コメント（理由あり）で抑制された指摘は除き、理由のない抑制コメントは指摘として返す。
  * 確信度での絞り込みは呼び出し側で行う（meetsConfidence）。
@@ -106,6 +144,7 @@ export async function scanSource(text: string, file: string, options: ScanSource
           customSources: config.sources?.[family] ?? [],
           customSinks: config.sinks?.[family] ?? [],
         },
+        externalSummaries: options.projectIndex?.getSummaries(family),
       });
     } finally {
       tree.delete();

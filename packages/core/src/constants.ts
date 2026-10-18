@@ -156,4 +156,38 @@ export const HARDCODED_API_KEY_REGEX =
 /** シークレット検出時にマスク表示する先頭文字数 */
 export const MASKED_SECRET_PREFIX_LENGTH = 8;
 
+/** クロスファイル関数要約でレシーバ付き呼び出し（obj.method）から除外する汎用メソッド名 */
+export const AMBIGUOUS_SUMMARY_NAMES = new Set([
+  'get',
+  'set',
+  'post',
+  'put',
+  'delete',
+  'patch',
+  'run',
+  'exec',
+  'execute',
+  'query',
+  'open',
+  'close',
+  'read',
+  'write',
+  'send',
+  'render',
+  'parse',
+  'load',
+  'loads',
+  'dump',
+  'dumps',
+  'format',
+  'create',
+  'invoke',
+  'call',
+  'apply',
+  'bind',
+  'toString',
+  'valueOf',
+]);
+
+
 

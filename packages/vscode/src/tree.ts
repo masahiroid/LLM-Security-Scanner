@@ -1,11 +1,13 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { showDataflowGraphPanel } from './dataflow-webview';
 import {
   collectReportItems,
   generateAiRemediationPrompt,
   getDiagnosticRuleCode,
   isActiveLlmscanDiagnostic,
 } from './report';
+import { COMMAND_SHOW_DATAFLOW_GRAPH } from './server/constants';
 
 export class FindingsTreeItem extends vscode.TreeItem {
   constructor(
@@ -102,6 +104,7 @@ export class FindingsTreeDataProvider implements vscode.TreeDataProvider<Finding
           element.uri,
           d,
         );
+        item.contextValue = 'finding';
         item.description = `L${line} • ${severityLabel}${isLlm ? ' • AI' : ''}`;
         const linePrefix = isJa ? '行' : 'Line';
         item.tooltip = new vscode.MarkdownString(`**${code}** (${linePrefix}: ${line})\n\n${d.message}`);
@@ -195,11 +198,21 @@ export function registerFindingsView(context: vscode.ExtensionContext): {
     await vscode.window.showTextDocument(doc, { preview: false });
   });
 
+  const showDataflowGraphCmd = vscode.commands.registerCommand(
+    COMMAND_SHOW_DATAFLOW_GRAPH,
+    (item?: FindingsTreeItem) => {
+      if (item?.uri && item.diagnostic) {
+        showDataflowGraphPanel(vscode, item.uri, item.diagnostic);
+      }
+    },
+  );
+
   context.subscriptions.push(
     treeView,
     toggleFilterCmd,
     copyFindingsCmd,
     exportReportCmd,
+    showDataflowGraphCmd,
     vscode.languages.onDidChangeDiagnostics(() => updateBadge()),
   );
 

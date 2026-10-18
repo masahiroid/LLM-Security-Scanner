@@ -1,7 +1,7 @@
 import type { Node } from 'web-tree-sitter';
 import { type CallInfo, type FileContext, type LanguageSpec, matchesCustom } from '../languages/spec';
 import { KIND_META } from '../rules';
-import { CLEAN_UNARY_OPERATORS } from '../constants';
+import { AMBIGUOUS_SUMMARY_NAMES, CLEAN_UNARY_OPERATORS } from '../constants';
 import type { Finding, LanguageId, OriginKind } from '../types';
 import {
   CALL_TYPES,
@@ -19,7 +19,7 @@ import {
 import { detectHardcodedSecret, extractSystemPromptTargets } from './llm-detectors';
 import { Scope } from './scope';
 import { type SinkOverrides, SinkReporter } from './sink-reporter';
-import { type SharedState, type Summary } from './summary';
+import { type FunctionSinkTarget, type SharedState, type Summary } from './summary';
 import { type T, addStep, createSourceTaint, union } from './taint';
 
 export interface AnalyzeInput {
@@ -28,11 +28,17 @@ export interface AnalyzeInput {
   language: LanguageId;
   spec: LanguageSpec;
   ctx: FileContext;
+  externalSummaries?: ReadonlyMap<string, Summary>;
 }
 
 /** 1 ファイルを解析して指摘を返す（指紋・抑制は呼び出し側で付与） */
 export function analyze(input: AnalyzeInput): Omit<Finding, 'fingerprint'>[] {
   return new Analyzer(input).run();
+}
+
+/** 1 ファイル内のトップレベル/名前付き関数の要約一覧を抽出する（クロスファイル解析用） */
+export function extractSummaries(input: AnalyzeInput): Map<string, Summary> {
+  return new Analyzer(input).summarizeAll();
 }
 
 export class Analyzer {
@@ -44,7 +50,10 @@ export class Analyzer {
 
   constructor(
     private readonly input: AnalyzeInput,
-    private readonly shared: SharedState = { summaries: new Map() },
+    private readonly shared: SharedState = {
+      summaries: new Map(),
+      externalSummaries: input.externalSummaries,
+    },
     private readonly summaryTarget: Node | null = null,
   ) {
     this.reporter = new SinkReporter({
@@ -57,6 +66,15 @@ export class Analyzer {
   run(): Omit<Finding, 'fingerprint'>[] {
     this.ev(this.input.root);
     return this.reporter.getFindings();
+  }
+
+  summarizeAll(): Map<string, Summary> {
+    const out = new Map<string, Summary>();
+    for (const [name, fn] of this.functionIndex().entries()) {
+      if (!fn) continue;
+      out.set(name, this.computeSummary(fn));
+    }
+    return out;
   }
 
   private get spec(): LanguageSpec {
@@ -491,6 +509,18 @@ export class Analyzer {
     const combined = union(receiverTaint, allArgs);
     const prop = this.spec.propagator(call);
     const summary = prop ? null : this.summaryFor(call);
+
+    if (summary?.sinks?.length) {
+      for (const arg of [...call.args, ...call.kwargs.values()]) {
+        const argTaint = this.ev(arg);
+        if (argTaint && (argTaint.origin === 'user' || argTaint.origin === 'llm')) {
+          for (const s of summary.sinks) {
+            this.checkSink(s.kind, arg, node, `${call.path}(...) -> ${s.sinkLabel}`, argTaint);
+          }
+        }
+      }
+    }
+
     if (summary?.type === 'source') {
       return this.sourceTaint(node, summary.origin, `${call.path}()（関数内で取得）`);
     }
@@ -590,9 +620,20 @@ export class Analyzer {
 
   private summaryFor(call: CallInfo): Summary | null {
     const m = /^(?:(?:this|self|static|parent|cls)\.)?([A-Za-z_$][\w$]*)$/.exec(call.path);
-    if (!m) return null;
-    const fn = this.functionIndex().get(m[1]);
-    if (!fn) return null;
+    if (m) {
+      const fn = this.functionIndex().get(m[1]);
+      if (fn) return this.computeSummary(fn);
+    }
+
+    const ext = this.shared.externalSummaries;
+    if (!ext) return null;
+    const direct = ext.get(call.path);
+    if (direct) return direct;
+    if (call.receiver && AMBIGUOUS_SUMMARY_NAMES.has(call.name)) return null;
+    return ext.get(call.name) ?? null;
+  }
+
+  private computeSummary(fn: Node): Summary {
     const cached = this.shared.summaries.get(fn.id);
     if (cached === 'pending') return { type: 'unknown' };
     if (cached) return cached;
@@ -611,6 +652,24 @@ export class Analyzer {
     } else {
       summary = { type: 'keep', built: t.built };
     }
+
+    const sinks: FunctionSinkTarget[] = [];
+    const seenSinks = new Set<string>();
+    for (const f of sub.reporter.getFindings()) {
+      if (f.origin === 'param' && f.kind !== 'suppression') {
+        const lastTrace = f.trace[f.trace.length - 1]?.message ?? '';
+        const sinkLabel = lastTrace.replace(/^危険な処理:\s*/, '') || f.kind;
+        const key = `${f.kind}:${sinkLabel}`;
+        if (!seenSinks.has(key)) {
+          seenSinks.add(key);
+          sinks.push({ kind: f.kind, sinkLabel });
+        }
+      }
+    }
+    if (sinks.length > 0) {
+      summary = { ...summary, sinks };
+    }
+
     this.shared.summaries.set(fn.id, summary);
     return summary;
   }
