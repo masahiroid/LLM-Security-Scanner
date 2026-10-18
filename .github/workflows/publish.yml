@@ -52,7 +52,7 @@ jobs:
         run: npm run package:extension
 
       - name: Sign in with federated Azure identity
-        if: vars.AZURE_CLIENT_ID != '' && vars.AZURE_TENANT_ID != ''
+        if: "!startsWith(github.ref, 'refs/tags/') && vars.AZURE_CLIENT_ID != '' && vars.AZURE_TENANT_ID != ''"
         uses: azure/login@v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
