@@ -11,7 +11,19 @@ English | [日本語 (Japanese)](README.ja.md)
 
 LLMScan is a high-performance local static security scanner and VS Code extension for **Python**, **TypeScript**, **JavaScript**, and **PHP**. It detects both traditional injection vulnerabilities (**OWASP Top 10**) and LLM-specific application threats (**OWASP LLM Top 10 - LLM05: Insecure Output Handling**).
 
-All scans run **100% locally** using Tree-sitter WebAssembly parsers. **No code or telemetry is ever transmitted over the network.**
+Static scans run **100% locally** using Tree-sitter WebAssembly parsers. No telemetry is sent. Optional AI triage sends a reviewed, masked snippet only after your explicit confirmation (see below).
+
+
+## Optional AI triage — v2.0.0
+
+Static analysis remains local and works without an API key. Optional AI triage is disabled until configured, requires a trusted workspace, and never runs automatically. CLI scans do not use AI.
+
+1. Run **LLMScan: Configure AI Triage (API Key / Provider)**. Select OpenAI, Anthropic or Ollama, enter a model ID supported by your account/server, and confirm the complete API endpoint URL. Cloud endpoints require HTTPS; local Ollama can use `http://127.0.0.1:11434/api/chat`. OpenAI uses the Chat Completions JSON API; Anthropic uses Messages; Ollama uses native Chat. Model access and API charges depend on your provider.
+2. API keys are kept in VS Code SecretStorage. Provider, model and endpoint are stored in extension global state, independent of repository settings. To remove them, rerun configuration and choose **Delete configuration and keys**.
+3. Right-click a sidebar finding and choose **Triage Finding with AI / Preview Patch**. Inspect the preview and confirm sending to the displayed endpoint. The payload contains the finding, trace messages and a short snippet bounded to its enclosing function (up to eight surrounding lines on each side); top-level findings send target lines only. File path metadata is omitted. Known keys, credential assignments, bearer tokens and private-key blocks are masked on a best-effort basis; inspect for remaining sensitive content. Editing the preview does not alter the payload: cancel and edit the source instead.
+4. Read the advisory verdict (`true_positive`, `false_positive`, `needs_review`) and reasoning. Review the proposed change in VS Code's Diff editor, then explicitly choose **Apply proposed patch**. Nothing is saved or executed automatically. Changed source documents are rejected; rerun triage. Patches involving masked target secrets are withheld to avoid overwriting real credentials with placeholders.
+
+AI output can be incorrect or manipulated by source comments. Findings and baselines are never automatically suppressed or changed by the verdict. Re-test and review every patch. Requests time out after 30 seconds. Authentication, rate-limit and provider failures leave your source untouched; check the configured URL, model and key before retrying. For local operation use a locally hosted Ollama model and loopback endpoint; remote endpoints follow their provider's data policies.
 
 ---
 

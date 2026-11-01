@@ -13,7 +13,8 @@
     "test": "vitest run",
     "scan": "node packages/cli/dist/cli.js scan",
     "package:extension": "npm run package -w llm-security-scan",
-    "publish:extension": "npm run publish -w llm-security-scan"
+    "publish:extension": "npm run publish -w llm-security-scan",
+    "check:release": "node scripts/check-release.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

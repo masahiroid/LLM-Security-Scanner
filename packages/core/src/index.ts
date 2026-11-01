@@ -8,6 +8,16 @@ export {
   type ScanSourceOptions,
 } from './scan';
 export { ProjectIndex, type FunctionSinkTarget, type Summary } from './engine';
+export {
+  extractCodeSnippet,
+  maskTriageSecrets,
+  validateTriageEndpoint,
+  buildTriagePrompt,
+  parseTriageResponse,
+  triageFindingWithLlm,
+  type ExtractedSnippet,
+  type FetchLike,
+} from './triage';
 export { loadConfig, parseConfig, DEFAULT_CONFIG, CONFIG_FILES } from './config';
 export { collectFiles, createExcludeMatcher } from './files';
 export { createBaseline, readBaseline, writeBaseline, type Baseline, type BaselineEntry } from './baseline';
@@ -26,3 +36,4 @@ export {
 export { getLanguageFamily, type Family } from './languages/spec';
 export * from './constants';
 
+export { triageContextBounds } from './triage-context';

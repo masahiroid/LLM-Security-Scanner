@@ -14,6 +14,10 @@ permissions:
 env:
   ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: "node24"
 
+concurrency:
+  group: marketplace-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -37,7 +41,11 @@ jobs:
       - name: Run test suite
         run: npm test
 
+      - name: Verify release metadata and public files
+        run: npm run check:release
+
       - name: Check publishing credentials
+        if: "!startsWith(github.ref, 'refs/tags/')"
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
           AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
@@ -67,10 +75,15 @@ jobs:
           AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
         run: |
           VSIX_PATH=$(ls packages/vscode/*.vsix | sort -V | tail -n 1)
+          VERSION=$(node -p "require('./packages/vscode/package.json').version")
+          if npx --no-install vsce show masahirocom.llm-security-scan --json | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));process.exit(d.versions.some(v=>v.version===process.argv[1])?0:1)" "$VERSION"; then
+            echo "v$VERSION is already on the Marketplace; skipping publish."
+            exit 0
+          fi
           if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_TENANT_ID" ]; then
-            npx vsce publish --packagePath "$VSIX_PATH" --azure-credential || echo "Version already published to Marketplace, continuing..."
+            npx --no-install vsce publish --packagePath "$VSIX_PATH" --azure-credential
           else
-            npx vsce publish --packagePath "$VSIX_PATH" || echo "Version already published to Marketplace, continuing..."
+            npx --no-install vsce publish --packagePath "$VSIX_PATH"
           fi
 
       - name: Create GitHub Release

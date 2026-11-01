@@ -2,7 +2,7 @@
   "name": "llm-security-scan",
   "displayName": "LLMScan - AI Security Scanner",
   "description": "Bilingual (EN/JA) local static security scanner for Python, TypeScript, JavaScript, and PHP. Detects code/SQL injection and OWASP LLM05.",
-  "version": "1.6.0",
+  "version": "2.0.0",
   "publisher": "masahirocom",
   "icon": "icon.png",
   "private": true,
@@ -39,7 +39,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": true,
-      "description": "静的解析のみで、コードの実行や外部への送信は行いません。"
+      "description": "Local static analysis is available; optional AI triage requires Workspace Trust."
     },
     "virtualWorkspaces": false
   },
@@ -121,6 +121,16 @@
         "title": "%llmscan.commands.showDataflowGraph%",
         "category": "LLMScan",
         "icon": "$(type-hierarchy-sub)"
+      },
+      {
+        "command": "llmscan.configureTriage",
+        "title": "%llmscan.commands.configureTriage%",
+        "category": "LLMScan"
+      },
+      {
+        "command": "llmscan.triageFinding",
+        "title": "%llmscan.commands.triageFinding%",
+        "category": "LLMScan"
       }
     ],
     "menus": {
@@ -166,6 +176,11 @@
           "command": "llmscan.showDataflowGraph",
           "when": "view == llmscan.findings && viewItem == finding",
           "group": "inline@1"
+        },
+        {
+          "command": "llmscan.triageFinding",
+          "when": "view == llmscan.findings && viewItem == finding",
+          "group": "2_ai@1"
         }
       ]
     },
@@ -208,7 +223,7 @@
     "publish": "npm run build && vsce publish --no-dependencies"
   },
   "dependencies": {
-    "@llmscan/core": "1.6.0",
+    "@llmscan/core": "2.0.0",
     "vscode-languageclient": "9.0.1",
     "vscode-languageserver": "9.0.1",
     "vscode-languageserver-textdocument": "1.0.12",
