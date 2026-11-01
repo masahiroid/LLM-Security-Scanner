@@ -3,11 +3,13 @@ import * as vscode from 'vscode';
 import { LanguageClient, type LanguageClientOptions, type ServerOptions, TransportKind } from 'vscode-languageclient/node';
 
 import { LSP_DEBUG_PORT, SUPPORTED_VSCODE_LANGUAGES } from './server/constants';
+import { registerTriage } from './triage';
 import { registerFindingsView } from './tree';
 
 let client: LanguageClient | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  registerTriage(context);
   const { provider } = registerFindingsView(context);
 
   const module = context.asAbsolutePath(path.join('dist', 'server.js'));

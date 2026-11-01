@@ -22,3 +22,8 @@ export const LANGUAGE_ID_MAP: Record<string, LanguageId> = {
 
 export const SUPPORTED_VSCODE_LANGUAGES = Object.keys(LANGUAGE_ID_MAP);
 
+
+export const COMMAND_CONFIGURE_TRIAGE = 'llmscan.configureTriage';
+export const COMMAND_TRIAGE_FINDING = 'llmscan.triageFinding';
+export const TRIAGE_CONFIG_KEY = 'llmscan.triage.config';
+export const TRIAGE_SECRET_PREFIX = 'llmscan.triage.key.';
