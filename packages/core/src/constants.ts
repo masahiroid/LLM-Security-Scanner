@@ -1,9 +1,12 @@
-import type { Confidence, OriginKind, Severity } from './types';
+import type { Confidence, OriginKind, Severity, TriageProvider } from './types';
 
 /**
  * コアエンジンおよびスキャナー全体で利用する定数定義
  * マジックナンバーおよびハードコードを排除し、設定可能な値を一元管理する
  */
+
+/** スキャナーのパッケージバージョン */
+export const LLMSCAN_VERSION = '2.0.0';
 
 /** トレース経路に記録する最大ステップ数 */
 export const MAX_TRACE_STEPS = 12;
@@ -189,5 +192,49 @@ export const AMBIGUOUS_SUMMARY_NAMES = new Set([
   'valueOf',
 ]);
 
+// --- Phase 4 (v2.0.0): LLM ハイブリッド・トリアージ定数 ---
 
+/** AI トリアージで対象行の前後何行をコード文脈として抽出するか */
+export const TRIAGE_CONTEXT_RADIUS_LINES = 8;
 
+/** AI トリアージ API リクエストの既定タイムアウト (ミリ秒) */
+export const TRIAGE_REQUEST_TIMEOUT_MS = 30_000;
+
+/** AI トリアージ応答の最大トークン数 */
+export const TRIAGE_MAX_TOKENS = 1024;
+
+/** Anthropic Messages API のバージョンヘッダ値 */
+export const ANTHROPIC_API_VERSION = '2023-06-01';
+
+/** プロバイダ別の既定 API エンドポイント */
+export const DEFAULT_TRIAGE_ENDPOINTS: Record<TriageProvider, string> = {
+  openai: 'https://api.openai.com/v1/chat/completions',
+  anthropic: 'https://api.anthropic.com/v1/messages',
+  ollama: 'http://127.0.0.1:11434/api/chat',
+};
+
+/** プロバイダ別の既定モデル名 */
+export const DEFAULT_TRIAGE_MODELS: Record<TriageProvider, string> = {
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-haiku-5-5',
+  ollama: 'qwen2.5-coder:7b',
+};
+
+/** サポートされる AI トリアージプロバイダ一覧 */
+export const SUPPORTED_TRIAGE_PROVIDERS: readonly TriageProvider[] = ['openai', 'anthropic', 'ollama'] as const;
+
+/** AI へ送信するプロンプトの最大文字数 */
+export const TRIAGE_MAX_INPUT_CHARS = 24_000;
+/** 受信する AI 応答の最大文字数 */
+export const TRIAGE_MAX_RESPONSE_CHARS = 64_000;
+/** 判定の再現性を優先した温度 */
+export const TRIAGE_TEMPERATURE = 0.1;
+export const TRIAGE_JSON_FENCE_PATTERN = /```(?:json)?\s*([\s\S]*?)```/i;
+/** 送信前にマスクする機密情報パターン（ベストエフォート） */
+export const TRIAGE_SECRET_PATTERNS = [
+  /\b(?:sk-[A-Za-z0-9_-]{16,}|AIza[\w-]{35}|hf_[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,})\b/g,
+  /((?:api[_-]?key|secret|password|passwd|access[_-]?token|authorization)\s*[:=]\s*)(["'`])[^"'`\r\n]+\2/gi,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+  /\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi,
+];
+export const TRIAGE_REDACTED = '[REDACTED]';

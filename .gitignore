@@ -13,3 +13,16 @@ AGENTS.md
 GEMINI.md
 .agents/
 .agent/
+
+# Local handoff notes, draft documents and scratch files (never publish)
+/CONTRIBUTING.md
+/SECURITY.md
+/scratch/
+/tmp/
+**/AGENTS.md
+**/GEMINI.md
+**/.agents/
+**/.agent/
+**/ROADMAP*.md
+**/roadmap*.md
+*.scratch.*

@@ -103,3 +103,47 @@ export interface ScanConfig {
   sources?: CustomSourceConfig;
   sinks?: CustomSinkConfig;
 }
+
+export type TriageProvider = 'openai' | 'anthropic' | 'ollama';
+
+export type TriageVerdict = 'true_positive' | 'false_positive' | 'needs_review';
+
+export interface TriageConfig {
+  provider: TriageProvider;
+  apiKey?: string;
+  model?: string;
+  endpoint?: string;
+  timeoutMs?: number;
+}
+
+export interface TriageRequestInput {
+  ruleId: string;
+  severity: string;
+  message: string;
+  filePath: string;
+  language: LanguageId;
+  /** 1-based start line */
+  startLine: number;
+  /** 1-based end line */
+  endLine: number;
+  trace: string[];
+  sourceText: string;
+  /** 1-based containing function boundaries; top-level findings use target lines only. */
+  contextStartLine?: number;
+  contextEndLine?: number;
+  cwe?: string;
+  recommendation?: string;
+  isJa?: boolean;
+}
+
+export interface TriageResult {
+  verdict: TriageVerdict;
+  confidence: Confidence;
+  reasoning: string;
+  patchedCode: string;
+  explanation: string;
+  provider: TriageProvider;
+  model: string;
+  originalCode: string;
+}
+

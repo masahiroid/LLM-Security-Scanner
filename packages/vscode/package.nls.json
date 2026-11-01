@@ -12,6 +12,7 @@
   "llmscan.config.minConfidence": "Minimum confidence level to display",
   "llmscan.config.showBaselined": "Show existing findings registered in baseline file",
   "llmscan.viewsWelcome.idle": "Detect security issues in your workspace.\n[Scan Workspace](command:llmscan.scanWorkspace)",
-  "llmscan.viewsWelcome.clean": "[Scan Workspace](command:llmscan.scanWorkspace)\n\n✓ No issues (No vulnerabilities detected)"
+  "llmscan.viewsWelcome.clean": "[Scan Workspace](command:llmscan.scanWorkspace)\n\n✓ No issues (No vulnerabilities detected)",
+  "llmscan.commands.configureTriage": "Configure AI Triage (API Key / Provider)",
+  "llmscan.commands.triageFinding": "Triage Finding with AI / Preview Patch"
 }
-
