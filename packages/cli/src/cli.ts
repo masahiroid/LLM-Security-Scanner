@@ -1,10 +1,8 @@
-import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   type Confidence,
-  type Finding,
   MAX_FILE_SIZE_BYTES,
   ProjectIndex,
   type ScanConfig,
@@ -18,18 +16,24 @@ import {
   meetsConfidence,
   readBaseline,
   scanSource,
-  toSarif,
+  LLMSCAN_VERSION,
+  DEFAULT_TRIAGE_CACHE_FILE,
+  TRIAGE_API_KEY_ENV,
+  TRIAGE_DEFAULT_CONCURRENCY,
+  TRIAGE_DEFAULT_MAX_FINDINGS,
   writeBaseline,
 } from '@llmscan/core';
+import {
+  EXIT_CODE_CLEAN, EXIT_CODE_ERROR, EXIT_CODE_FINDINGS, SUPPORTED_CONFIDENCES, SUPPORTED_FAIL_ON, SUPPORTED_FORMATS,
+  DEFAULT_TRIAGE_MIN_SEVERITY, type OutputFormat,
+} from './constants';
+import { formatReport } from './format';
+import { getGitChangedFiles } from './git';
+import { TRIAGE_PARSE_OPTIONS, resolveTriageOptions } from './triage-options';
+import { applyTriage } from './triage-step';
+import type { Item } from './types';
 
-const VERSION = '1.6.0';
-const EXIT_CODE_CLEAN = 0;
-const EXIT_CODE_FINDINGS = 1;
-const EXIT_CODE_ERROR = 2;
-
-const SUPPORTED_FORMATS = ['text', 'json', 'sarif'] as const;
-const SUPPORTED_CONFIDENCES: Confidence[] = ['low', 'medium', 'high'];
-const SUPPORTED_FAIL_ON: (Severity | 'none')[] = ['low', 'medium', 'high', 'critical', 'none'];
+const VERSION = LLMSCAN_VERSION;
 
 const HELP = `LLM Security Scanner ${VERSION}（コマンド名: llmscan）
 
@@ -49,68 +53,27 @@ const HELP = `LLM Security Scanner ${VERSION}（コマンド名: llmscan）
   --min-confidence <low|medium|high>
   --fail-on <low|medium|high|critical|none>
                                 ベースライン外にこの重大度以上の指摘があれば終了コード 1
+
+AI トリアージ（任意・既定では一切通信しません）:
+  --triage                      指摘を AI で判定する（API キーは環境変数 ${TRIAGE_API_KEY_ENV} から読む）
+  --triage-dry-run              送信予定のマスク済み内容を標準エラーに表示するだけで送信しない
+  --triage-provider <openai|anthropic|ollama>
+  --triage-model <モデル名>     --triage-endpoint <URL>（HTTPS 必須。Ollama のみループバック HTTP 可）
+  --triage-min-severity <low|medium|high|critical>  対象とする最小重大度（既定: ${DEFAULT_TRIAGE_MIN_SEVERITY}）
+  --triage-max-findings <数>    送信する最大件数（既定: ${TRIAGE_DEFAULT_MAX_FINDINGS}）
+  --triage-concurrency <数>     同時送信数（既定: ${TRIAGE_DEFAULT_CONCURRENCY}）
+  --triage-cache <ファイル>     判定キャッシュ（既定: ${DEFAULT_TRIAGE_CACHE_FILE}）  --no-triage-cache
+  --triage-ignore-false-positives
+                                AI が誤検知と判定した指摘を --fail-on の判定から除外する
   -h, --help
 
 終了コード: ${EXIT_CODE_CLEAN} = 問題なし / ${EXIT_CODE_FINDINGS} = 失敗条件の指摘あり / ${EXIT_CODE_ERROR} = 実行エラー
 `;
 
-interface Item {
-  finding: Finding;
-  relativePath: string;
-}
-
-function getGitChangedFiles(root: string, diffBase?: string): Set<string> {
-  const ref = diffBase ?? 'HEAD';
-  const out = new Set<string>();
-  try {
-    const diffOut = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMRTUXB', ref], {
-      cwd: root,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    for (const line of diffOut.split(/\r?\n/)) {
-      const trimmed = line.trim().replace(/\\/g, '/');
-      if (trimmed) out.add(trimmed);
-    }
-    if (!diffBase) {
-      const untrackedOut = execFileSync('git', ['ls-files', '--others', '--exclude-standard'], {
-        cwd: root,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      for (const line of untrackedOut.split(/\r?\n/)) {
-        const trimmed = line.trim().replace(/\\/g, '/');
-        if (trimmed) out.add(trimmed);
-      }
-    }
-  } catch (e) {
-    throw new Error(`Git 差分の取得に失敗しました (${ref}): ${(e as Error).message}`);
-  }
-  return out;
-}
-
 function wasmDir(): string | undefined {
   // バンドル版は dist/wasm に WASM を同梱する
   const dir = path.join(__dirname, 'wasm');
   return fs.existsSync(path.join(dir, 'tree-sitter.wasm')) ? dir : undefined;
-}
-
-function formatText(items: Item[], baselined: number, scanned: number): string {
-  const lines: string[] = [];
-  const sevLabel: Record<Severity, string> = { critical: 'CRITICAL', high: 'HIGH', medium: 'MEDIUM', low: 'LOW' };
-  for (const { finding: f, relativePath } of items) {
-    lines.push(
-      `${relativePath}:${f.range.start.line + 1}:${f.range.start.column + 1}  ${sevLabel[f.severity]}  ${f.ruleId}  (確信度: ${f.confidence})`,
-    );
-    lines.push(`  ${f.message}`);
-    for (const s of f.trace) lines.push(`    ${s.range.start.line + 1}行目: ${s.message}`);
-    lines.push('');
-  }
-  const counts = (['critical', 'high', 'medium', 'low'] as Severity[])
-    .map((s) => `${sevLabel[s]} ${items.filter((i) => i.finding.severity === s).length}`)
-    .join(' / ');
-  lines.push(`${scanned} ファイルを解析: 指摘 ${items.length} 件（${counts}）` + (baselined > 0 ? `、ベースラインで除外 ${baselined} 件` : ''));
-  return lines.join('\n') + '\n';
 }
 
 async function scan(argv: string[]): Promise<number> {
@@ -130,6 +93,7 @@ async function scan(argv: string[]): Promise<number> {
       'min-confidence': { type: 'string' },
       'fail-on': { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
+      ...TRIAGE_PARSE_OPTIONS,
     },
   });
   if (values.help) {
@@ -141,6 +105,7 @@ async function scan(argv: string[]): Promise<number> {
   }
 
   const root = path.resolve(values.root ?? process.cwd());
+  const triage = resolveTriageOptions(values, root, process.env);
   let config: ScanConfig;
   if (values.config) {
     const dir = path.dirname(path.resolve(values.config));
@@ -208,20 +173,17 @@ async function scan(argv: string[]): Promise<number> {
   const items = known ? all.filter((i) => !known.has(i.finding.fingerprint)) : all;
   const baselined = all.length - items.length;
 
-  let out: string;
-  if (values.format === 'json') {
-    out = JSON.stringify({ version: VERSION, findings: items.map((i) => ({ ...i.finding, file: i.relativePath })) }, null, 2) + '\n';
-  } else if (values.format === 'sarif') {
-    out = JSON.stringify(toSarif(items, VERSION), null, 2) + '\n';
-  } else {
-    out = formatText(items, baselined, files.length);
-  }
+  if (triage) await applyTriage(items, loadedTexts, triage, (m) => process.stderr.write(m));
+
+  const out = formatReport(values.format as OutputFormat, items, baselined, files.length);
   if (values.output) fs.writeFileSync(values.output, out);
   else process.stdout.write(out);
 
   if (config.failOn === 'none') return EXIT_CODE_CLEAN;
   const threshold = SEVERITY_ORDER[config.failOn];
-  return items.some((i) => i.finding.kind !== 'suppression' && SEVERITY_ORDER[i.finding.severity] >= threshold)
+  return items.some((i) => i.finding.kind !== 'suppression' &&
+    !(triage?.ignoreFalsePositives && i.triage?.verdict === 'false_positive') &&
+    SEVERITY_ORDER[i.finding.severity] >= threshold)
     ? EXIT_CODE_FINDINGS
     : EXIT_CODE_CLEAN;
 }

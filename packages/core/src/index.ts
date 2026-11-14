@@ -37,3 +37,15 @@ export { getLanguageFamily, type Family } from './languages/spec';
 export * from './constants';
 
 export { triageContextBounds } from './triage-context';
+export { triageInputForFinding } from './triage-input';
+export { triageCacheKey, readTriageCache, writeTriageCache, type TriageCache, type CachedTriage } from './triage-cache';
+export {
+  planBatchTriage,
+  runBatchTriage,
+  type BatchTriageTarget,
+  type BatchTriageOptions,
+  type BatchTriageResult,
+  type PlannedTriage,
+  type TriagePlan,
+  type TriageSkipReason,
+} from './triage-runner';

@@ -14,9 +14,9 @@ LLMScan is a high-performance local static security scanner and VS Code extensio
 Static scans run **100% locally** using Tree-sitter WebAssembly parsers. No telemetry is sent. Optional AI triage sends a reviewed, masked snippet only after your explicit confirmation (see below).
 
 
-## Optional AI triage — v2.0.0
+## Optional AI triage — v2.1.0
 
-Static analysis remains local and works without an API key. Optional AI triage is disabled until configured, requires a trusted workspace, and never runs automatically. CLI scans do not use AI.
+Static analysis remains local and works without an API key. Optional AI triage is disabled until configured, requires a trusted workspace, and never runs automatically. The CLI uses AI only with `--triage` (v2.1.0; see CLI Usage).
 
 1. Run **LLMScan: Configure AI Triage (API Key / Provider)**. Select OpenAI, Anthropic or Ollama, enter a model ID supported by your account/server, and confirm the complete API endpoint URL. Cloud endpoints require HTTPS; local Ollama can use `http://127.0.0.1:11434/api/chat`. OpenAI uses the Chat Completions JSON API; Anthropic uses Messages; Ollama uses native Chat. Model access and API charges depend on your provider.
 2. API keys are kept in VS Code SecretStorage. Provider, model and endpoint are stored in extension global state, independent of repository settings. To remove them, rerun configuration and choose **Delete configuration and keys**.
@@ -106,6 +106,30 @@ node packages/cli/dist/cli.js scan [paths...] [--format text|json|sarif] [--outp
   if: always()
   with:
     sarif_file: llmscan.sarif
+```
+
+### AI Triage (Optional, v2.1.0)
+
+Findings are sent to an AI only when `--triage` is given. Without it, the CLI makes no network requests.
+
+```bash
+export LLMSCAN_TRIAGE_API_KEY=...   # read only from the environment (not needed for Ollama)
+node packages/cli/dist/cli.js scan --triage --triage-provider anthropic --triage-model <model-id> \
+  [--triage-endpoint <url>] [--triage-min-severity high] [--triage-max-findings 20] [--triage-concurrency 4] \
+  [--triage-cache .llmscan/triage-cache.json | --no-triage-cache] [--triage-ignore-false-positives]
+```
+
+- **`--triage-dry-run`** prints the masked payloads to stderr without sending anything. Use it to audit before adoption.
+- **Selection**: by default, up to 20 findings of severity `high` or above, highest first. Payloads match the VS Code extension: a masked snippet bounded to the enclosing function plus the finding. File paths are never sent.
+- **Output**: JSON adds `triage` to each finding; SARIF adds `properties.llmscanTriage`. Findings judged `false_positive` get a SARIF `suppressions` entry (`kind: external`, `status: underReview`), distinct from human-approved suppressions; the finding itself is kept.
+- **Exit code**: AI verdicts do not affect the exit code unless `--triage-ignore-false-positives` is set, which excludes `false_positive` findings from the `--fail-on` check.
+- **Cache**: verdicts are cached in `.llmscan/triage-cache.json`, keyed by the masked payload and model, so identical content is not resent. The cache contains reasoning text; add it to `.gitignore`.
+- Failed requests are reported by count and error type only; scan results are still written.
+
+```yaml
+- run: node packages/cli/dist/cli.js scan --diff-base origin/main --format sarif --output llmscan.sarif --triage --triage-provider anthropic --triage-model <model-id>
+  env:
+    LLMSCAN_TRIAGE_API_KEY: ${{ secrets.LLMSCAN_TRIAGE_API_KEY }}
 ```
 
 ---
