@@ -14,9 +14,9 @@ LLMScan analyzes **Python**, **TypeScript**, **JavaScript**, and **PHP** source 
 All scans run **100% locally** inside your editor using Tree-sitter WebAssembly. **Zero code is sent to external servers**, making it fully safe for proprietary codebases and untrusted workspaces.
 
 
-## Optional AI triage — v2.0.0
+## Optional AI triage — v2.1.0
 
-Static analysis remains local and works without an API key. Optional AI triage is disabled until configured, requires a trusted workspace, and never runs automatically. CLI scans do not use AI.
+Static analysis remains local and works without an API key. Optional AI triage is disabled until configured, requires a trusted workspace, and never runs automatically. The CLI uses AI only with `--triage` (v2.1.0; see the repository README).
 
 1. Run **LLMScan: Configure AI Triage (API Key / Provider)**. Select OpenAI, Anthropic or Ollama, enter a model ID supported by your account/server, and confirm the complete API endpoint URL. Cloud endpoints require HTTPS; local Ollama can use `http://127.0.0.1:11434/api/chat`. OpenAI uses the Chat Completions JSON API; Anthropic uses Messages; Ollama uses native Chat. Model access and API charges depend on your provider.
 2. API keys are kept in VS Code SecretStorage. Provider, model and endpoint are stored in extension global state, independent of repository settings. To remove them, rerun configuration and choose **Delete configuration and keys**.

@@ -16,9 +16,9 @@ LLMScan は、**Python** / **TypeScript** / **JavaScript** / **PHP** のソー�
 通常の静的解析は手元のマシン上で完結（Tree-sitter WASM 利用）し、テレメトリを送信しません。任意の AI トリアージは、送信内容を確認・承認した場合だけマスク済みコード片を指定先へ送信します（下記参照）。
 
 
-## 任意の AI トリアージ — v2.0.0
+## 任意の AI トリアージ — v2.1.0
 
-通常の静的解析はローカルで完結し、API キーは不要です。AI トリアージは設定するまで無効で、信頼済みワークスペースで指摘ごとに手動実行した場合だけ通信します。CLI は AI を使用しません。
+通常の静的解析はローカルで完結し、API キーは不要です。AI トリアージは設定するまで無効で、信頼済みワークスペースで指摘ごとに手動実行した場合だけ通信します。CLI でも `--triage` を付けた場合のみ利用できます（v2.1.0、下記「CLI の使い方」参照）。
 
 1. **LLMScan: AI トリアージ設定（API キー / プロバイダ）** を実行します。OpenAI / Anthropic / Ollama を選び、契約・サーバーで利用できるモデル ID と完全な API URL を指定します。クラウドは HTTPS、ローカル Ollama は `http://127.0.0.1:11434/api/chat` が利用できます。OpenAI は Chat Completions JSON API、Anthropic は Messages、Ollama はネイティブ Chat に対応します。利用可能なモデルと料金はプロバイダに依存します。
 2. API キーは VS Code の SecretStorage、プロバイダ・モデル・URL はリポジトリ設定から独立した拡張のグローバル状態に保存します。削除する場合は設定コマンドから **設定・キーを削除** を選びます。
@@ -108,6 +108,30 @@ node packages/cli/dist/cli.js scan [パス...] [--format text|json|sarif] [--out
   if: always()
   with:
     sarif_file: llmscan.sarif
+```
+
+### AI トリアージ（任意・v2.1.0）
+
+`--triage` を付けた場合だけ、指摘を AI に判定させます。付けなければ従来通り一切通信しません。
+
+```bash
+export LLMSCAN_TRIAGE_API_KEY=...   # API キーは環境変数からのみ読みます（Ollama は不要）
+node packages/cli/dist/cli.js scan --triage --triage-provider anthropic --triage-model <モデル ID> \
+  [--triage-endpoint <URL>] [--triage-min-severity high] [--triage-max-findings 20] [--triage-concurrency 4] \
+  [--triage-cache .llmscan/triage-cache.json | --no-triage-cache] [--triage-ignore-false-positives]
+```
+
+- **`--triage-dry-run`**: 送信予定のマスク済み内容を標準エラーに表示するだけで、送信しません。導入前の監査に使ってください。
+- **送信対象**: 既定は重大度 `high` 以上・最大 20 件で、重大度の高い順に選びます。送る内容は VS Code 版と同じで、関数内に限ったマスク済みのコード片と指摘のみです。ファイルパスは送りません。
+- **出力**: JSON は各指摘に `triage`、SARIF は `properties.llmscanTriage` を付けます。AI が誤検知と判定した指摘は SARIF の `suppressions`（`kind: external`, `status: underReview`）として出力します。人が承認した抑制とは区別され、指摘自体は消えません。
+- **終了コード**: 既定では AI の判定は終了コードに影響しません。`--triage-ignore-false-positives` を付けた場合だけ、誤検知と判定された指摘を `--fail-on` の判定から除外します。
+- **キャッシュ**: 判定はマスク済み送信内容・モデルをキーに `.llmscan/triage-cache.json` に保存し、同じ内容は再送信しません。判定理由を含むため、`.gitignore` に追加することを推奨します。
+- 送信に失敗した指摘は件数とエラー種別のみ表示し、スキャン結果はそのまま出力します。
+
+```yaml
+- run: node packages/cli/dist/cli.js scan --diff-base origin/main --format sarif --output llmscan.sarif --triage --triage-provider anthropic --triage-model <モデル ID>
+  env:
+    LLMSCAN_TRIAGE_API_KEY: ${{ secrets.LLMSCAN_TRIAGE_API_KEY }}
 ```
 
 ---

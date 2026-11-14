@@ -1,5 +1,6 @@
 import { KIND_META, OWASP_A05, OWASP_LLM05, SUPPRESSION_RULE_ID } from './rules';
-import type { Finding, Severity } from './types';
+import { SARIF_TRIAGE_PROPERTY } from './constants';
+import type { Finding, Severity, TriageSummary } from './types';
 
 const LEVEL: Record<Severity, 'error' | 'warning' | 'note'> = {
   critical: 'error',
@@ -13,6 +14,20 @@ const SECURITY_SEVERITY: Record<Severity, string> = { critical: '9.5', high: '8.
 interface SarifFinding {
   finding: Finding;
   relativePath: string;
+  /** AI トリアージ結果（任意） */
+  triage?: TriageSummary;
+}
+
+/** AI が誤検知と判定した指摘は SARIF の外部抑制として出力し、人の判断と区別できるようにする */
+function triageFields(triage: TriageSummary | undefined) {
+  if (!triage) return { properties: {}, extra: {} };
+  const { verdict, confidence, reasoning, provider, model } = triage;
+  return {
+    properties: { [SARIF_TRIAGE_PROPERTY]: { verdict, confidence, reasoning, provider, model } },
+    extra: verdict === 'false_positive'
+      ? { suppressions: [{ kind: 'external', status: 'underReview', justification: `AI triage (${provider}/${model}, confidence: ${confidence}): ${reasoning}` }] }
+      : {},
+  };
 }
 
 function ruleDescriptor(f: Finding) {
@@ -72,7 +87,8 @@ export function toSarif(items: SarifFinding[], toolVersion: string): object {
             rules: [...rules.values()],
           },
         },
-        results: items.map(({ finding: f, relativePath }) => {
+        results: items.map(({ finding: f, relativePath, triage }) => {
+          const t = triageFields(triage);
           const uri = relativePath.replace(/\\/g, '/');
           return {
             ruleId: f.ruleId,
@@ -81,7 +97,8 @@ export function toSarif(items: SarifFinding[], toolVersion: string): object {
             message: { text: f.message },
             locations: [{ physicalLocation: { artifactLocation: { uri }, region: region(f) } }],
             partialFingerprints: { llmscanFingerprint: f.fingerprint },
-            properties: { confidence: f.confidence, severity: f.severity, origin: f.origin },
+            properties: { confidence: f.confidence, severity: f.severity, origin: f.origin, ...t.properties },
+            ...t.extra,
             ...(f.trace.length > 0
               ? {
                   codeFlows: [
