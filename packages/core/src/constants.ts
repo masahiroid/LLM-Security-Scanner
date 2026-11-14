@@ -6,7 +6,7 @@ import type { Confidence, OriginKind, Severity, TriageProvider } from './types';
  */
 
 /** スキャナーのパッケージバージョン */
-export const LLMSCAN_VERSION = '2.0.0';
+export const LLMSCAN_VERSION = '2.1.0';
 
 /** トレース経路に記録する最大ステップ数 */
 export const MAX_TRACE_STEPS = 12;
@@ -238,3 +238,24 @@ export const TRIAGE_SECRET_PATTERNS = [
   /\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi,
 ];
 export const TRIAGE_REDACTED = '[REDACTED]';
+
+// --- Phase 5 (v2.1.0): CLI / CI 向け一括トリアージ定数 ---
+
+/** 一括トリアージの既定同時送信数 */
+export const TRIAGE_DEFAULT_CONCURRENCY = 4;
+/** 同時送信数の上限 */
+export const TRIAGE_MAX_CONCURRENCY = 16;
+/** 1 回の実行で AI に送る指摘数の既定上限（コスト上限） */
+export const TRIAGE_DEFAULT_MAX_FINDINGS = 20;
+/** 1 回の実行で AI に送るプロンプト合計文字数の上限 */
+export const TRIAGE_MAX_TOTAL_INPUT_CHARS = 400_000;
+/** CLI が API キーを読む環境変数名 */
+export const TRIAGE_API_KEY_ENV = 'LLMSCAN_TRIAGE_API_KEY';
+/** 判定キャッシュの既定パス（ルートからの相対） */
+export const DEFAULT_TRIAGE_CACHE_FILE = '.llmscan/triage-cache.json';
+/** 判定キャッシュのファイル形式バージョン */
+export const TRIAGE_CACHE_FORMAT_VERSION = 1;
+/** キャッシュに保存する判定理由の最大文字数 */
+export const TRIAGE_CACHE_MAX_REASONING_CHARS = 2_000;
+/** SARIF の properties に格納するトリアージ結果のキー */
+export const SARIF_TRIAGE_PROPERTY = 'llmscanTriage';

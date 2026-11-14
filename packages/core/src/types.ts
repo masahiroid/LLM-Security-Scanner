@@ -147,3 +147,14 @@ export interface TriageResult {
   originalCode: string;
 }
 
+
+/** CI / レポート出力用の判定結果（パッチは含めない） */
+export interface TriageSummary {
+  verdict: TriageVerdict;
+  confidence: Confidence;
+  reasoning: string;
+  provider: TriageProvider;
+  model: string;
+  /** キャッシュから再利用した判定か */
+  cached: boolean;
+}
